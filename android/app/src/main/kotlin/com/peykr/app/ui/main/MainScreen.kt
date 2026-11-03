@@ -66,7 +66,12 @@ import com.peykr.app.ui.theme.TextSecondary
 @Composable
 fun MainScreen(onNavigate: (NavKey) -> Unit, onPeopleClick: () -> Unit, onSettingsClick: () -> Unit, contactRepository: TrustedContactRepository, modifier: Modifier = Modifier, viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(contactRepository) }) {
   val state by viewModel.uiState.collectAsStateWithLifecycle()
-  val count = (state as? MainScreenUiState.Success)?.data?.size ?: 0
+  val peopleSummary = when (val uiState = state) {
+    is MainScreenUiState.Success -> stringResource(R.string.trusted_people_count, uiState.data.size)
+    is MainScreenUiState.DatabaseError -> stringResource(R.string.database_error_status)
+    is MainScreenUiState.Loading -> stringResource(R.string.database_loading)
+    is MainScreenUiState.Error -> stringResource(R.string.database_error_status)
+  }
   Scaffold(modifier, containerColor = Navy950, contentWindowInsets = WindowInsets.safeDrawing, bottomBar = { PremiumBottomNavigation(Main, onNavigate) }) { padding ->
     Page(Modifier.padding(padding)) {
       HomeBrand()
@@ -74,7 +79,7 @@ fun MainScreen(onNavigate: (NavKey) -> Unit, onPeopleClick: () -> Unit, onSettin
       Text(stringResource(R.string.home_headline), color = TextPrimary, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.align(Alignment.CenterHorizontally))
       Text(stringResource(R.string.home_description), color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.align(Alignment.CenterHorizontally))
       PremiumSurface(Modifier.fillMaxWidth()) { Row(verticalAlignment = Alignment.CenterVertically) { PremiumIcon(PremiumIconKind.Backup, stringResource(R.string.system_status)); Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(stringResource(R.string.system_status), color = TextSecondary, style = MaterialTheme.typography.bodySmall); Text(stringResource(R.string.system_status_value), color = TextPrimary, style = MaterialTheme.typography.titleMedium) }; Box(Modifier.size(9.dp).clip(CircleShape).background(PrimaryTurquoise)) } }
-      PremiumInfoRow(PremiumIconKind.People, stringResource(R.string.trusted_people), stringResource(R.string.trusted_people_count, count), stringResource(R.string.trusted_people), onPeopleClick)
+      PremiumInfoRow(PremiumIconKind.People, stringResource(R.string.trusted_people), peopleSummary, stringResource(R.string.trusted_people), onPeopleClick)
       PremiumInfoRow(PremiumIconKind.Location, stringResource(R.string.location_sharing), stringResource(R.string.location_off), stringResource(R.string.location_sharing), onSettingsClick)
     }
   }
@@ -85,10 +90,61 @@ fun MainScreen(onNavigate: (NavKey) -> Unit, onPeopleClick: () -> Unit, onSettin
 @Composable private fun FocusEmblem() { Box(Modifier.fillMaxWidth().height(124.dp), contentAlignment = Alignment.Center) { Canvas(Modifier.size(112.dp).semantics { contentDescription = "PEYKR güvenlik sembolü" }) { val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f); drawCircle(Color(0x1834D9FF), 48.dp.toPx()); drawCircle(PrimaryTurquoise, 32.dp.toPx(), style = Stroke(2.dp.toPx())); drawArc(Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent)), 210f, 240f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)); drawCircle(PrimaryTurquoise, 3.dp.toPx(), center); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y + 13.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y - 7.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round) } } }
 
 @Composable fun TrustedPeopleScreen(onNavigate: (NavKey) -> Unit, onBack: () -> Unit, contactRepository: TrustedContactRepository, modifier: Modifier = Modifier, viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(contactRepository) }) {
-  val state by viewModel.uiState.collectAsStateWithLifecycle(); val people = (state as? MainScreenUiState.Success)?.data.orEmpty()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   Scaffold(modifier, containerColor = Navy950, contentWindowInsets = WindowInsets.safeDrawing, bottomBar = { PremiumBottomNavigation(TrustedPeople, onNavigate) }) { padding -> Page(Modifier.padding(padding)) {
     BackAction(onBack); SectionHeader(stringResource(R.string.trusted_people), stringResource(R.string.trusted_people_description))
-    if (people.isEmpty()) { TrustIllustration(); Text(stringResource(R.string.trusted_people_empty_title), color = TextPrimary, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.CenterHorizontally)); Text(stringResource(R.string.trusted_people_empty_description), color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.align(Alignment.CenterHorizontally)); PremiumSurface(Modifier.fillMaxWidth()) { Row(verticalAlignment = Alignment.CenterVertically) { PremiumIcon(PremiumIconKind.Info, stringResource(R.string.trusted_people_privacy_note)); Spacer(Modifier.width(12.dp)); Text(stringResource(R.string.trusted_people_privacy_note), color = TextSecondary, style = MaterialTheme.typography.bodyMedium) } } } else people.forEach { person -> PremiumInfoRow(PremiumIconKind.People, person.displayName, pairingLabel(person.pairingStatus), person.displayName) }
+    when (val uiState = state) {
+      is MainScreenUiState.Loading -> {
+        Text(stringResource(R.string.database_loading), color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.align(Alignment.CenterHorizontally))
+      }
+      is MainScreenUiState.DatabaseError -> {
+        PremiumSurface(Modifier.fillMaxWidth()) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            PremiumIcon(PremiumIconKind.Shield, stringResource(R.string.database_error_title))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+              Text(stringResource(R.string.database_error_title), color = TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+              Spacer(Modifier.height(4.dp))
+              Text(stringResource(R.string.database_error_description), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+          }
+          Spacer(Modifier.height(12.dp))
+          TextButton(onClick = { viewModel.retry() }, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.database_error_retry), color = PrimaryTurquoise, style = MaterialTheme.typography.labelLarge)
+          }
+        }
+      }
+      is MainScreenUiState.Error -> {
+        PremiumSurface(Modifier.fillMaxWidth()) {
+          Text(stringResource(R.string.database_error_title), color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+          Spacer(Modifier.height(4.dp))
+          Text(stringResource(R.string.database_error_description), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+          Spacer(Modifier.height(8.dp))
+          TextButton(onClick = { viewModel.retry() }, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.database_error_retry), color = PrimaryTurquoise)
+          }
+        }
+      }
+      is MainScreenUiState.Success -> {
+        val people = uiState.data
+        if (people.isEmpty()) {
+          TrustIllustration()
+          Text(stringResource(R.string.trusted_people_empty_title), color = TextPrimary, style = MaterialTheme.typography.titleLarge, modifier = Modifier.align(Alignment.CenterHorizontally))
+          Text(stringResource(R.string.trusted_people_empty_description), color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.align(Alignment.CenterHorizontally))
+          PremiumSurface(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              PremiumIcon(PremiumIconKind.Info, stringResource(R.string.trusted_people_privacy_note))
+              Spacer(Modifier.width(12.dp))
+              Text(stringResource(R.string.trusted_people_privacy_note), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+          }
+        } else {
+          people.forEach { person ->
+            PremiumInfoRow(PremiumIconKind.People, person.displayName, pairingLabel(person.pairingStatus), person.displayName)
+          }
+        }
+      }
+    }
   } }
 }
 

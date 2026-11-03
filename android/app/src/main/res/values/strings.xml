@@ -43,4 +43,9 @@
     <string name="pairing_revoked">Eşleştirme iptal edildi</string>
     <string name="identity_setting">Cihaz kimliği</string>
     <string name="identity_detail">Yalnızca bu kurulumda kullanılır. Uygulama silinirse yeniden eşleştirme gerekir.</string>
+    <string name="database_error_status">Kullanılamıyor</string>
+    <string name="database_error_title">Veritabanı güvenliği hatası</string>
+    <string name="database_error_description">Şifrelenmiş veritabanına erişilemedi. Güvenlik anahtarı kullanılamıyor veya dosya bozulmuş olabilir.</string>
+    <string name="database_error_retry">Yeniden dene</string>
+    <string name="database_loading">Yükleniyor…</string>
 </resources>

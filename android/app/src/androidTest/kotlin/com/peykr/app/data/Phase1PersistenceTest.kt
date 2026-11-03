@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.peykr.app.core.identity.AndroidKeyStoreDeviceIdentity
+import com.peykr.app.core.identity.DeviceIdentityResult
 import com.peykr.app.data.contacts.SqliteTrustedContactRepository
 import com.peykr.app.domain.contacts.TrustedContact
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -18,7 +20,10 @@ class Phase1PersistenceTest {
   @Test
   fun deviceIdentity_isStableAcrossReads() {
     val identity = AndroidKeyStoreDeviceIdentity()
-    assertEquals(identity.getOrCreate(), identity.getOrCreate())
+    val first = identity.getOrCreate()
+    val second = identity.getOrCreate()
+    assertTrue(first is DeviceIdentityResult.Success)
+    assertEquals(first, second)
   }
 
   @Test
@@ -37,6 +42,19 @@ class Phase1PersistenceTest {
       file.delete()
       File("${file.path}-shm").delete()
       File("${file.path}-wal").delete()
+    }
+  }
+
+  @Test
+  fun repository_initializationAndDisposalAreSafe() = runTest {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val file = File(context.cacheDir, "peykr-safe-${System.nanoTime()}.db")
+    try {
+      val repo = SqliteTrustedContactRepository(context, file.absolutePath)
+      repo.close()
+      // Disposing should not crash or throw unhandled exceptions
+    } finally {
+      file.delete()
     }
   }
 }

@@ -44,4 +44,9 @@
     <string name="pairing_revoked">Pairing revoked</string>
     <string name="identity_setting">Device identity</string>
     <string name="identity_detail">Installation-only identity. Re-pairing is required after uninstall.</string>
+    <string name="database_error_status">Unavailable</string>
+    <string name="database_error_title">Database security error</string>
+    <string name="database_error_description">The encrypted database could not be accessed. The security key may be unavailable or corrupted.</string>
+    <string name="database_error_retry">Retry</string>
+    <string name="database_loading">Loading…</string>
 </resources>

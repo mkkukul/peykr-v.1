@@ -1,7 +1,6 @@
 package com.peykr.app
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -9,18 +8,22 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.compose.ui.platform.LocalContext
 import com.peykr.app.data.contacts.SqliteTrustedContactRepository
+import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.ui.main.MainScreen
 import com.peykr.app.ui.main.SettingsScreen
 import com.peykr.app.ui.main.TrustedPeopleScreen
 import com.peykr.app.localization.AppLanguage
 
 @Composable
-fun MainNavigation(language: AppLanguage, onLanguageSelected: (AppLanguage) -> Unit) {
+fun MainNavigation(
+  language: AppLanguage,
+  onLanguageSelected: (AppLanguage) -> Unit,
+  contactRepository: TrustedContactRepository? = null,
+) {
   val context = LocalContext.current
-  val contactRepository = remember(context) { SqliteTrustedContactRepository(context) }
-  DisposableEffect(contactRepository) {
-    onDispose { contactRepository.close() }
-  }
+  val repository = contactRepository
+    ?: (context.applicationContext as? AppContainer)?.contactRepository
+    ?: remember(context.applicationContext) { SqliteTrustedContactRepository(context.applicationContext) }
   val backStack = rememberNavBackStack(Main)
   fun navigateTo(key: NavKey) {
     if (backStack.lastOrNull() == key) return
@@ -38,14 +41,14 @@ fun MainNavigation(language: AppLanguage, onLanguageSelected: (AppLanguage) -> U
               onNavigate = ::navigateTo,
               onPeopleClick = { navigateTo(TrustedPeople) },
               onSettingsClick = { navigateTo(Settings) },
-              contactRepository = contactRepository,
+              contactRepository = repository,
             )
           }
           entry<TrustedPeople> {
             TrustedPeopleScreen(
               onNavigate = ::navigateTo,
               onBack = { backStack.removeLastOrNull() },
-              contactRepository = contactRepository,
+              contactRepository = repository,
             )
           }
           entry<Settings> {
