@@ -14,11 +14,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 sealed interface MainScreenUiState {
   data object Loading : MainScreenUiState
 
-  data class DatabaseError(val state: DatabaseState) : MainScreenUiState
+  data class DatabaseError(
+    val state: DatabaseState,
+    val diagnosticMessage: String? = null,
+  ) : MainScreenUiState
 
   data class IdentityError(
     val state: DeviceIdentityState,
@@ -30,6 +34,7 @@ sealed interface MainScreenUiState {
   data class Success(
     val data: List<TrustedContact>,
     val identityState: DeviceIdentityState = DeviceIdentityState.Ready(DeviceIdentityInfo("", "")),
+    val dbState: DatabaseState = DatabaseState.READY,
   ) : MainScreenUiState
 }
 
@@ -43,7 +48,12 @@ class MainScreenViewModel(
       ?: MutableStateFlow(DeviceIdentityState.Ready(DeviceIdentityInfo("local", "")))
 
   val uiState: StateFlow<MainScreenUiState> =
-    combine(dataRepository.initializationState, dataRepository.contacts, identityFlow) { dbState, contacts, idState ->
+    combine(
+      dataRepository.initializationState,
+      dataRepository.contacts,
+      identityFlow,
+      dataRepository.diagnosticDetails,
+    ) { dbState, contacts, idState, diagMsg ->
       when {
         dbState == DatabaseState.INITIALIZING || dbState == DatabaseState.MIGRATION_IN_PROGRESS || idState is DeviceIdentityState.Initializing -> {
           MainScreenUiState.Loading
@@ -51,11 +61,13 @@ class MainScreenViewModel(
         dbState in listOf(
           DatabaseState.KEY_MISSING,
           DatabaseState.KEY_INVALID,
+          DatabaseState.FILE_ACCESS_ERROR,
+          DatabaseState.SCHEMA_ERROR,
           DatabaseState.CORRUPTED,
           DatabaseState.MIGRATION_FAILED,
           DatabaseState.MIGRATION_REQUIRED,
         ) -> {
-          MainScreenUiState.DatabaseError(dbState)
+          MainScreenUiState.DatabaseError(dbState, diagMsg)
         }
         idState is DeviceIdentityState.KeystoreUnavailable ||
         idState is DeviceIdentityState.IdentityInvalidated ||
@@ -66,7 +78,7 @@ class MainScreenViewModel(
           )
         }
         dbState == DatabaseState.READY && idState is DeviceIdentityState.Ready -> {
-          MainScreenUiState.Success(data = contacts, identityState = idState)
+          MainScreenUiState.Success(data = contacts, identityState = idState, dbState = dbState)
         }
         else -> {
           MainScreenUiState.Loading
@@ -79,5 +91,11 @@ class MainScreenViewModel(
   fun retry() {
     dataRepository.retry()
     deviceIdentity?.retry()
+  }
+
+  fun deleteContact(id: String) {
+    viewModelScope.launch {
+      runCatching { dataRepository.delete(id) }
+    }
   }
 }

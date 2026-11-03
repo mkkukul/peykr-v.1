@@ -16,6 +16,11 @@ import com.peykr.app.ui.main.MainScreen
 import com.peykr.app.ui.main.SettingsScreen
 import com.peykr.app.ui.main.TrustedPeopleScreen
 import com.peykr.app.ui.pairing.PairingScreen
+import com.peykr.app.ui.settings.AboutDetailScreen
+import com.peykr.app.ui.settings.BiometricSettingsDetailScreen
+import com.peykr.app.ui.settings.DataBackupDetailScreen
+import com.peykr.app.ui.settings.DeviceIdentityDetailScreen
+import com.peykr.app.ui.settings.LocationSharingDetailScreen
 
 @Composable
 fun MainNavigation(
@@ -71,6 +76,34 @@ fun MainNavigation(
             onLanguageSelected = onLanguageSelected,
             deviceIdentity = identity,
             securityGate = gate,
+          )
+        }
+        entry<DeviceIdentityDetail> {
+          DeviceIdentityDetailScreen(
+            deviceIdentity = identity,
+            onBack = { backStack.removeLastOrNull() },
+          )
+        }
+        entry<BiometricSettingsDetail> {
+          BiometricSettingsDetailScreen(
+            securityGate = gate,
+            onBack = { backStack.removeLastOrNull() },
+          )
+        }
+        entry<LocationSharingDetail> {
+          LocationSharingDetailScreen(
+            onBack = { backStack.removeLastOrNull() },
+          )
+        }
+        entry<DataBackupDetail> {
+          DataBackupDetailScreen(
+            contactRepository = repository,
+            onBack = { backStack.removeLastOrNull() },
+          )
+        }
+        entry<AboutDetail> {
+          AboutDetailScreen(
+            onBack = { backStack.removeLastOrNull() },
           )
         }
         entry<PairingFlow> {

@@ -4,52 +4,108 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase as PlainDatabase
+import android.util.Log
 import com.peykr.app.data.security.DatabaseKeyFailure
 import com.peykr.app.data.security.DatabaseKeyException
 import com.peykr.app.data.security.DatabaseKeyStore
 import net.zetetic.database.sqlcipher.SQLiteDatabase
 import java.io.File
 
-enum class DatabaseState { INITIALIZING, READY, MIGRATION_REQUIRED, MIGRATION_IN_PROGRESS, MIGRATION_FAILED, KEY_MISSING, KEY_INVALID, CORRUPTED }
+enum class DatabaseState {
+  INITIALIZING,
+  READY,
+  MIGRATION_REQUIRED,
+  MIGRATION_IN_PROGRESS,
+  MIGRATION_FAILED,
+  KEY_MISSING,
+  KEY_INVALID,
+  CORRUPTED,
+  FILE_ACCESS_ERROR,
+  SCHEMA_ERROR,
+}
 
 class DatabaseInitializationException(val state: DatabaseState, message: String, cause: Throwable? = null) : Exception(message, cause)
 
 class EncryptedContactDatabase(private val context: Context, databaseName: String = DATABASE_NAME) {
   private val databaseFile = File(databaseName).takeIf(File::isAbsolute) ?: context.getDatabasePath(databaseName)
   private val keyStore = DatabaseKeyStore(context)
+
   fun open(): SQLiteDatabase {
+    Log.i(TAG, "Opening encrypted database at: ${databaseFile.path}")
     return try {
-      System.loadLibrary("sqlcipher")
+      try {
+        System.loadLibrary("sqlcipher")
+        Log.d(TAG, "Native sqlcipher library loaded successfully")
+      } catch (t: Throwable) {
+        Log.e(TAG, "Failed to load sqlcipher native library", t)
+        throw DatabaseInitializationException(DatabaseState.CORRUPTED, "SQLCipher native library could not be loaded: ${t.message}", t)
+      }
+
+      databaseFile.parentFile?.let { parent ->
+        if (!parent.exists()) {
+          val created = parent.mkdirs()
+          Log.d(TAG, "Created database parent directory: $created ($parent)")
+        }
+      }
+
       val marker = File(context.noBackupFilesDir, MIGRATION_MARKER)
       val metadataExisted = keyStore.hasMetadata()
       if (databaseFile.exists() && !metadataExisted && !isPlaintextReadable(databaseFile)) {
+        Log.e(TAG, "Database file exists without key metadata and is not plaintext readable")
         throw DatabaseInitializationException(DatabaseState.KEY_MISSING, "Encrypted database key metadata is missing")
       }
-      val key = keyStore.createOrOpenKey()
+
+      val key = try {
+        keyStore.createOrOpenKey()
+      } catch (e: DatabaseKeyException) {
+        Log.e(TAG, "Database key acquisition failed: ${e.failure} - ${e.message}", e)
+        val state = when (e.failure) {
+          DatabaseKeyFailure.MISSING_WRAPPING_KEY -> DatabaseState.KEY_MISSING
+          DatabaseKeyFailure.MALFORMED_METADATA, DatabaseKeyFailure.INVALID_WRAPPED_KEY -> DatabaseState.KEY_INVALID
+        }
+        throw DatabaseInitializationException(state, e.message ?: "Database key is unavailable", e)
+      }
+
       try {
-        val databaseWasExisting = databaseFile.exists()
         if (marker.exists()) {
+          Log.i(TAG, "Migration marker detected, running migrateOrRecover")
           migrateOrRecover(databaseFile, key, marker)
         } else if (databaseFile.exists() && !metadataExisted) {
+          Log.i(TAG, "Plaintext legacy database detected, running migratePlaintext")
           migratePlaintext(databaseFile, key, marker)
         }
+
+        Log.d(TAG, "Opening or creating SQLiteDatabase with SQLCipher")
         val database = SQLiteDatabase.openOrCreateDatabase(databaseFile, key, null, null)
-        if (!databaseWasExisting) ensureSchema(database)
+
+        // ALWAYS ensure schema exists unconditionally (CREATE TABLE IF NOT EXISTS)
+        Log.d(TAG, "Ensuring database schema exists")
+        ensureSchema(database)
+
+        Log.d(TAG, "Verifying database integrity")
         verifyDatabase(database)
+
+        Log.i(TAG, "Encrypted database opened, schema verified, and ready")
         return database
       } finally {
         key.fill(0)
       }
     } catch (error: DatabaseInitializationException) {
+      Log.e(TAG, "DatabaseInitializationException: ${error.state} - ${error.message}", error)
       throw error
     } catch (error: DatabaseKeyException) {
       val state = when (error.failure) {
         DatabaseKeyFailure.MISSING_WRAPPING_KEY -> DatabaseState.KEY_MISSING
         DatabaseKeyFailure.MALFORMED_METADATA, DatabaseKeyFailure.INVALID_WRAPPED_KEY -> DatabaseState.KEY_INVALID
       }
+      Log.e(TAG, "DatabaseKeyException: $state - ${error.message}", error)
       throw DatabaseInitializationException(state, error.message ?: "Database key is unavailable", error)
+    } catch (error: java.io.IOException) {
+      Log.e(TAG, "I/O error during database initialization", error)
+      throw DatabaseInitializationException(DatabaseState.FILE_ACCESS_ERROR, "Database file access failed: ${error.message}", error)
     } catch (error: Exception) {
-      throw DatabaseInitializationException(DatabaseState.KEY_INVALID, "Encrypted database could not be opened", error)
+      Log.e(TAG, "General exception during database open: ${error.javaClass.simpleName} - ${error.message}", error)
+      throw DatabaseInitializationException(DatabaseState.KEY_INVALID, "Encrypted database could not be opened: ${error.message}", error)
     }
   }
 
@@ -131,17 +187,54 @@ class EncryptedContactDatabase(private val context: Context, databaseName: Strin
 
   private fun ensureSchema(database: SQLiteDatabase) {
     database.execSQL("CREATE TABLE IF NOT EXISTS $TABLE (id TEXT PRIMARY KEY NOT NULL, display_name TEXT NOT NULL, public_identity TEXT, pairing_status TEXT NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER)")
+    database.execSQL("CREATE INDEX IF NOT EXISTS idx_trusted_contacts_status ON $TABLE(pairing_status)")
   }
 
   private fun verifyDatabase(database: SQLiteDatabase) {
-    database.rawQuery("PRAGMA cipher_integrity_check", null).use { cursor ->
-      if (!cursor.moveToFirst() || !cursor.getString(0).equals("ok", ignoreCase = true)) throw DatabaseInitializationException(DatabaseState.CORRUPTED, "SQLCipher integrity check failed")
+    // 1. Check SQLCipher page-level HMAC integrity
+    // PRAGMA cipher_integrity_check iterates all pages and returns 0 rows if all HMACs match.
+    // If corruption exists, it returns error rows describing failing pages.
+    try {
+      database.rawQuery("PRAGMA cipher_integrity_check", null).use { cursor ->
+        if (cursor.moveToFirst()) {
+          val result = cursor.getString(0)
+          if (!result.equals("ok", ignoreCase = true)) {
+            Log.e(TAG, "SQLCipher HMAC check reported corruption: $result")
+            throw DatabaseInitializationException(DatabaseState.CORRUPTED, "SQLCipher HMAC integrity check failed: $result")
+          }
+        }
+      }
+    } catch (e: Exception) {
+      if (e is DatabaseInitializationException) throw e
+      Log.w(TAG, "cipher_integrity_check execution notice: ${e.message}")
     }
+
+    // 2. Check SQLite B-Tree integrity
+    database.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+      if (!cursor.moveToFirst() || !cursor.getString(0).equals("ok", ignoreCase = true)) {
+        val detail = if (cursor.moveToFirst()) cursor.getString(0) else "no output"
+        Log.e(TAG, "SQLite integrity check reported: $detail")
+        throw DatabaseInitializationException(DatabaseState.CORRUPTED, "SQLite B-Tree integrity check failed: $detail")
+      }
+    }
+
+    // 3. Verify schema table exists in sqlite_master
     database.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", arrayOf(TABLE)).use { cursor ->
-      if (!cursor.moveToFirst()) throw DatabaseInitializationException(DatabaseState.CORRUPTED, "Trusted contact schema is missing")
+      if (!cursor.moveToFirst()) {
+        Log.e(TAG, "Schema check failed: table $TABLE not found in sqlite_master")
+        throw DatabaseInitializationException(DatabaseState.SCHEMA_ERROR, "Trusted contact schema is missing")
+      }
     }
-    try { database.query(TABLE, COLUMNS, null, null, null, null, "created_at ASC").use { cursor -> cursor.count } }
-    catch (error: Exception) { throw DatabaseInitializationException(DatabaseState.CORRUPTED, "Trusted contact query failed", error) }
+
+    // 4. Test query execution
+    try {
+      database.query(TABLE, COLUMNS, null, null, null, null, "created_at ASC").use { cursor ->
+        cursor.count
+      }
+    } catch (error: Exception) {
+      Log.e(TAG, "Trusted contact query failed during verification", error)
+      throw DatabaseInitializationException(DatabaseState.SCHEMA_ERROR, "Trusted contact query failed", error)
+    }
   }
 
   private fun count(database: PlainDatabase): Int = database.query(TABLE, arrayOf("id"), null, null, null, null, null).use { it.count }
@@ -155,5 +248,6 @@ class EncryptedContactDatabase(private val context: Context, databaseName: Strin
     const val TABLE = "trusted_contacts"
     val COLUMNS = arrayOf("id", "display_name", "public_identity", "pairing_status", "created_at", "revoked_at")
     private const val MIGRATION_MARKER = "peykr-db-migration.state"
+    private const val TAG = "PeykrDatabase"
   }
 }

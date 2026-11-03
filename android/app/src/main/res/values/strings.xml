@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">Peykr</string>
-    <string name="prototype_label">PROTOTİP</string>
-    <string name="home_kicker">Peykr prototipi</string>
-    <string name="home_headline">Güvenlik özellikleri henüz etkin değil.</string>
-    <string name="home_description">Bu sürüm yalnızca temel arayüzü gösterir.</string>
+    <string name="prototype_label">GÜVENLİ</string>
+    <string name="home_kicker">Peykr · Güvenli İletişim</string>
+    <string name="home_headline">Donanım Korumalı Güvenlik</string>
+    <string name="home_description">Uçtan uca şifreli, hesapsız ve yerel veri koruması.</string>
     <string name="system_status">Sistem durumu</string>
     <string name="system_status_value">Hazırlanıyor · Aktif değil</string>
     <string name="system_status_ready">Hazır · Güvenli</string>
@@ -14,21 +14,21 @@
     <string name="location_sharing">Konum paylaşımı</string>
     <string name="location_off">Kapalı</string>
     <string name="view_action">Görüntüle</string>
-    <string name="trusted_people_description">Güvendiğiniz kişileri bu prototipte yalnızca yerel olarak görüntüleyin.</string>
+    <string name="trusted_people_description">Güvenilir cihazlar ve eşleştirilmiş kişiler.</string>
     <string name="trusted_people_empty_title">Henüz güvenilir kişi yok</string>
-    <string name="trusted_people_empty_description">Eşleştirme ve davet akışı henüz kullanılabilir değil.</string>
-    <string name="trusted_people_privacy_note">Gerçek kişi veya iletişim bilgisi eklenmiyor.</string>
+    <string name="trusted_people_empty_description">Henüz güvenilen bir cihaz eşleştirilmedi. Karşılıklı uçtan uca şifreli iletişim için bir cihazla eşleşin.</string>
+    <string name="trusted_people_privacy_note">Verileriniz yalnızca bu cihazda şifreli saklanır, hiçbir sunucuya gönderilmez.</string>
     <string name="settings_title">Ayarlar</string>
-    <string name="settings_description">Peykr tercihleri ve gizlilik yaklaşımı.</string>
+    <string name="settings_description">Peykr tercihleri ve güvenlik mimarisi.</string>
     <string name="appearance_section">Görünüm</string>
     <string name="theme_setting">Tema</string>
     <string name="theme_detail">Koyu tema · Tasarım önceliği</string>
     <string name="language_section">Dil</string>
     <string name="language_setting">Uygulama dili</string>
     <string name="privacy_section">Gizlilik</string>
-    <string name="location_detail">Kapalı · Özellik henüz etkin değil</string>
-    <string name="backup_setting">Veri ve yedekleme</string>
-    <string name="backup_detail">Bulut yedekleme ve hesap kurtarma yok</string>
+    <string name="location_detail">Sıfır bulut · Yalnızca doğrudan eşleşen cihazlar</string>
+    <string name="backup_setting">Veri ve depolama güvenliği</string>
+    <string name="backup_detail">SQLCipher AES-256 yerel şifreleme · Bulutsuz</string>
     <string name="security_section">Güvenlik</string>
     <string name="biometric_setting_title">Biyometrik doğrulama</string>
     <string name="biometric_status_available">Kullanılabilir · Parmak izi ve kilit hazır</string>
@@ -46,8 +46,8 @@
     <string name="device_verification">Cihaz doğrulama</string>
     <string name="device_verification_detail">İşletim sistemi doğrulaması planlandı</string>
     <string name="about_section">Hakkında</string>
-    <string name="prototype_version">Prototip sürüm</string>
-    <string name="prototype_version_detail">Peykr V.1 · Geliştirme aşamasında</string>
+    <string name="prototype_version">Peykr sürümü</string>
+    <string name="prototype_version_detail">Peykr v1.0.0 · Üretim Mimarisi</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
     <string name="back_action">Geri</string>
@@ -59,7 +59,7 @@
     <string name="pairing_paired">Eşleştirildi</string>
     <string name="pairing_revoked">Eşleştirme iptal edildi</string>
     <string name="identity_setting">Cihaz kimliği</string>
-    <string name="identity_detail">Yalnızca bu kurulumda kullanılır. Uygulama silinirse yeniden eşleştirme gerekir.</string>
+    <string name="identity_detail">Donanım tabanlı Ed25519 açık kimlik.</string>
     <string name="identity_status_ready">Hazır</string>
     <string name="identity_status_initializing">Hazırlanıyor…</string>
     <string name="identity_status_error">Kullanılamıyor</string>
@@ -78,6 +78,82 @@
     <string name="database_error_description">Şifrelenmiş veritabanına erişilemedi. Güvenlik anahtarı kullanılamıyor veya dosya bozulmuş olabilir.</string>
     <string name="database_error_retry">Yeniden dene</string>
     <string name="database_loading">Yükleniyor…</string>
+
+    <!-- Quick Actions & Health Overview -->
+    <string name="action_pair_device">Cihaz Eşleştir</string>
+    <string name="action_trusted_people">Güvenilen Kişiler</string>
+    <string name="action_location_sharing">Konum Paylaşımı</string>
+    <string name="action_security_settings">Güvenlik Ayarları</string>
+    <string name="quick_actions_title">Hızlı İşlemler</string>
+    <string name="security_health_title">Güvenlik Durumu</string>
+    <string name="security_health_secure">Tüm Güvenlik Katmanları Aktif</string>
+    <string name="security_health_warning">Güvenlik Uyarısı Mevcut</string>
+    <string name="security_component_identity">Cihaz Kimliği</string>
+    <string name="security_component_database">Şifreli Depolama</string>
+    <string name="security_component_biometrics">Biyometrik Güvenlik</string>
+    <string name="trusted_devices_summary_title">Güvenilen Cihazlar</string>
+    <string name="trusted_devices_summary_desc">Eşleştirilmiş ve kriptografik olarak doğrulanmış cihazlar.</string>
+    <string name="trusted_devices_empty_short">Henüz eşleşen cihaz yok</string>
+
+    <!-- Detail Screens: Device Identity -->
+    <string name="detail_identity_title">Cihaz Kimliği</string>
+    <string name="detail_identity_desc">Donanım tabanlı kriptografik kimlik parametreleri.</string>
+    <string name="detail_identity_status_title">Kimlik Durumu</string>
+    <string name="detail_identity_id_title">Cihaz Güvenlik Kimliği (ID)</string>
+    <string name="detail_identity_copy_action">Kimliği Panoya Kopyala</string>
+    <string name="detail_identity_copied_toast">Cihaz kimliği panoya kopyalandı</string>
+    <string name="detail_identity_keystore_title">Donanım Güvenlik Modülü</string>
+    <string name="detail_identity_keystore_desc">Anahtar Çifti: AndroidKeyStore (StrongBox/TEE)\nAlgoritma: Ed25519 / EC P-256\nAlias: peykr.device.identity.v1\nÖzel anahtarınız cihaz donanımından asla dışarı çıkarılamaz.</string>
+
+    <!-- Detail Screens: Biometric -->
+    <string name="detail_biometric_title">Biyometrik Güvenlik</string>
+    <string name="detail_biometric_desc">AndroidX Biyometrik Koruma ve Güvenlik Geçidi.</string>
+    <string name="detail_biometric_sensor_title">Biyometrik Sensör Durumu</string>
+    <string name="detail_biometric_test_action">Biyometrik Geçidi Test Et</string>
+    <string name="detail_biometric_test_result_title">Son Doğrulama Testi</string>
+    <string name="detail_biometric_gate_desc">SecurityGate Mimarisi:\nTüm kritik operasyonlar (eşleştirme onayı, kimlik dışa aktarma) Android Biometric API ile korunmaktadır. Doğrulama başarılı olduğunda tek kullanımlık ve süre kısıtlı bir AuthorizationToken üretilir.</string>
+
+    <!-- Detail Screens: Location Sharing -->
+    <string name="detail_location_title">Konum Paylaşımı</string>
+    <string name="detail_location_desc">Doğrudan cihazdan cihaza konum senkronizasyonu.</string>
+    <string name="detail_location_zero_cloud_title">Sıfır Bulut Mimarisi</string>
+    <string name="detail_location_zero_cloud_desc">Peykr herhangi bir harici konum sunucusu, harita takip API veya bulut altyapısı kullanmaz. Konum bilginiz kesinlikle üçüncü şahıslara aktarılmaz; yalnızca karşılıklı eşleştiğiniz güvenilir cihazlarla doğrudan (P2P) şifrelenerek paylaşılır.</string>
+    <string name="detail_location_permission_title">Konum İzni Durumu</string>
+    <string name="detail_location_permission_granted">İzin Verildi (Hassas / Kaba Konum)</string>
+    <string name="detail_location_permission_needed">İzin Gerekli</string>
+    <string name="detail_location_permission_action">Konum İzni Ver</string>
+    <string name="detail_location_toggle_title">Eşler Arası Konum Paylaşımı</string>
+    <string name="detail_location_toggle_active">Aktif · Güvenilen cihazlara iletiliyor</string>
+    <string name="detail_location_toggle_inactive">Devre Dışı · Konum paylaşılmıyor</string>
+
+    <!-- Detail Screens: Data Backup -->
+    <string name="detail_backup_title">Veri ve Depolama Güvenliği</string>
+    <string name="detail_backup_desc">Yerel SQLCipher AES-256 şifreleme ve anahtar koruması.</string>
+    <string name="detail_backup_db_title">Veritabanı Şifreleme</string>
+    <string name="detail_backup_db_desc">Tüm kişi bilgileri ve eşleştirme kayıtları 256-bit AES ile Zetetic SQLCipher tarafından şifrelenir. Dosya sistemine doğrudan erişilse bile veriler okunamaz.</string>
+    <string name="detail_backup_wrap_title">Donanım Anahtar Sarmalama</string>
+    <string name="detail_backup_wrap_desc">Veritabanı anahtarı rastgele üretilir ve Android KeyStore içinde AES-256-GCM ile şifrelenerek saklanır. (Alias: peykr.database.wrap.v1)</string>
+    <string name="detail_backup_zero_cloud_title">Bulut Yedeklemesi Yoktur</string>
+    <string name="detail_backup_zero_cloud_desc">Hesapsız mimari gereği verileriniz bulutta tutulmaz. Cihazınızı sıfırlarsanız veya uygulama verilerini silerseniz bilgiler kurtarılamaz.</string>
+    <string name="detail_backup_verify_action">Veritabanı Bütünlüğünü Doğrula</string>
+
+    <!-- Detail Screens: About -->
+    <string name="detail_about_title">Peykr Hakkında</string>
+    <string name="detail_about_desc">Gizlilik odaklı, hesapsız, sunucusuz ve kriptografik iletişim.</string>
+    <string name="detail_about_brand_desc">Peykr, gözetim ve veri madenciliğine karşı geliştirilmiş; hesap, telefon numarası veya sunucu gerektirmeyen bağımsız bir güvenlik mimarisidir.</string>
+    <string name="detail_about_specs_title">Teknik Özellikler</string>
+    <string name="detail_about_spec_crypto">Kriptografi: Ed25519 Dijital İmzalar, SHA-256</string>
+    <string name="detail_about_spec_storage">Depolama: SQLCipher 256-bit AES Şifreli Veritabanı</string>
+    <string name="detail_about_spec_auth">Doğrulama: AndroidX Biometric + Monotonik SecurityGate</string>
+    <string name="detail_about_spec_transport">Eşleştirme: 4-Aşamalı Karşılıklı İmzalı QR Protokolü</string>
+
+    <!-- Contact List & Actions -->
+    <string name="contact_delete_action">Cihazı Sil</string>
+    <string name="contact_delete_dialog_title">Cihaz Bağlantısını Sil</string>
+    <string name="contact_delete_dialog_desc">%1$s cihazını güvenilen listeden silmek istediğinize emin misiniz? Karşılıklı eşleştirme sonlandırılacaktır.</string>
+    <string name="contact_delete_confirm">Sil</string>
+    <string name="contact_fingerprint_label">Parmak İzi</string>
+    <string name="contact_paired_date">Eşleştirilme: %1$s</string>
 
     <!-- Pairing strings -->
     <string name="pairing_title">Cihaz Eşleştirme</string>

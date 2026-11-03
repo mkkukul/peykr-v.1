@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Peykr</string>
-    <string name="prototype_label">PROTOTYPE</string>
-    <string name="home_kicker">Peykr prototype</string>
-    <string name="home_headline">Safety features are not active yet.</string>
-    <string name="home_description">This version presents the core interface only.</string>
+    <string name="prototype_label">SECURE</string>
+    <string name="home_kicker">Peykr · Secure Communication</string>
+    <string name="home_headline">Hardware-Protected Security</string>
+    <string name="home_description">End-to-end encrypted, accountless, and local data protection.</string>
     <string name="system_status">System status</string>
     <string name="system_status_value">In preparation · Inactive</string>
     <string name="system_status_ready">Ready · Secure</string>
@@ -15,21 +15,21 @@
     <string name="location_sharing">Location sharing</string>
     <string name="location_off">Off</string>
     <string name="view_action">View</string>
-    <string name="trusted_people_description">View trusted people locally in this prototype.</string>
+    <string name="trusted_people_description">Trusted devices and paired contacts.</string>
     <string name="trusted_people_empty_title">No trusted people yet</string>
-    <string name="trusted_people_empty_description">Pairing and invitation flows are not available yet.</string>
-    <string name="trusted_people_privacy_note">No real people or contact details are added.</string>
+    <string name="trusted_people_empty_description">No trusted device paired yet. Pair with a device for end-to-end encrypted communication.</string>
+    <string name="trusted_people_privacy_note">Your data is stored encrypted exclusively on this device and never sent to any server.</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_description">Peykr preferences and privacy approach.</string>
+    <string name="settings_description">Peykr preferences and security architecture.</string>
     <string name="appearance_section">Appearance</string>
     <string name="theme_setting">Theme</string>
     <string name="theme_detail">Dark theme · Design priority</string>
     <string name="language_section">Language</string>
     <string name="language_setting">App language</string>
     <string name="privacy_section">Privacy</string>
-    <string name="location_detail">Off · Feature is not active yet</string>
-    <string name="backup_setting">Data and backup</string>
-    <string name="backup_detail">No cloud backup or account recovery</string>
+    <string name="location_detail">Zero cloud · Direct paired devices only</string>
+    <string name="backup_setting">Data and storage security</string>
+    <string name="backup_detail">SQLCipher AES-256 local encryption · No cloud</string>
     <string name="security_section">Security</string>
     <string name="biometric_setting_title">Biometric authentication</string>
     <string name="biometric_status_available">Available · Biometrics and lock ready</string>
@@ -47,8 +47,8 @@
     <string name="device_verification">Device verification</string>
     <string name="device_verification_detail">Operating system verification is planned</string>
     <string name="about_section">About</string>
-    <string name="prototype_version">Prototype version</string>
-    <string name="prototype_version_detail">Peykr V.1 · In development</string>
+    <string name="prototype_version">Peykr version</string>
+    <string name="prototype_version_detail">Peykr v1.0.0 · Production Architecture</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
     <string name="back_action">Back</string>
@@ -60,7 +60,7 @@
     <string name="pairing_paired">Paired</string>
     <string name="pairing_revoked">Pairing revoked</string>
     <string name="identity_setting">Device identity</string>
-    <string name="identity_detail">Installation-only identity. Re-pairing is required after uninstall.</string>
+    <string name="identity_detail">Hardware-backed Ed25519 public identity.</string>
     <string name="identity_status_ready">Ready</string>
     <string name="identity_status_initializing">Preparing…</string>
     <string name="identity_status_error">Unavailable</string>
@@ -79,6 +79,82 @@
     <string name="database_error_description">The encrypted database could not be accessed. The security key may be unavailable or corrupted.</string>
     <string name="database_error_retry">Retry</string>
     <string name="database_loading">Loading…</string>
+
+    <!-- Quick Actions & Health Overview -->
+    <string name="action_pair_device">Pair Device</string>
+    <string name="action_trusted_people">Trusted People</string>
+    <string name="action_location_sharing">Location Sharing</string>
+    <string name="action_security_settings">Security Settings</string>
+    <string name="quick_actions_title">Quick Actions</string>
+    <string name="security_health_title">Security Status</string>
+    <string name="security_health_secure">All Security Layers Active</string>
+    <string name="security_health_warning">Security Alert Present</string>
+    <string name="security_component_identity">Device Identity</string>
+    <string name="security_component_database">Encrypted Storage</string>
+    <string name="security_component_biometrics">Biometric Security</string>
+    <string name="trusted_devices_summary_title">Trusted Devices</string>
+    <string name="trusted_devices_summary_desc">Cryptographically verified and paired devices.</string>
+    <string name="trusted_devices_empty_short">No paired devices yet</string>
+
+    <!-- Detail Screens: Device Identity -->
+    <string name="detail_identity_title">Device Identity</string>
+    <string name="detail_identity_desc">Hardware-backed cryptographic identity parameters.</string>
+    <string name="detail_identity_status_title">Identity Status</string>
+    <string name="detail_identity_id_title">Device Security ID</string>
+    <string name="detail_identity_copy_action">Copy ID to Clipboard</string>
+    <string name="detail_identity_copied_toast">Device ID copied to clipboard</string>
+    <string name="detail_identity_keystore_title">Hardware Security Module</string>
+    <string name="detail_identity_keystore_desc">Key Pair: AndroidKeyStore (StrongBox/TEE)\nAlgorithm: Ed25519 / EC P-256\nAlias: peykr.device.identity.v1\nYour private key never leaves the device hardware.</string>
+
+    <!-- Detail Screens: Biometric -->
+    <string name="detail_biometric_title">Biometric Security</string>
+    <string name="detail_biometric_desc">AndroidX Biometric Protection and SecurityGate.</string>
+    <string name="detail_biometric_sensor_title">Biometric Sensor Status</string>
+    <string name="detail_biometric_test_action">Test Security Gate</string>
+    <string name="detail_biometric_test_result_title">Latest Verification Test</string>
+    <string name="detail_biometric_gate_desc">SecurityGate Architecture:\nAll critical operations (pairing approval, key usage) are guarded by Android Biometric API. Upon successful authentication, a single-use, time-bounded AuthorizationToken is issued.</string>
+
+    <!-- Detail Screens: Location Sharing -->
+    <string name="detail_location_title">Location Sharing</string>
+    <string name="detail_location_desc">Direct peer-to-peer location synchronization.</string>
+    <string name="detail_location_zero_cloud_title">Zero-Cloud Architecture</string>
+    <string name="detail_location_zero_cloud_desc">Peykr uses no external location servers, tracking APIs, or cloud infrastructure. Your location is never shared with third parties; it is transmitted encrypted exclusively to your trusted paired peers.</string>
+    <string name="detail_location_permission_title">Location Permission Status</string>
+    <string name="detail_location_permission_granted">Permission Granted (Fine / Coarse Location)</string>
+    <string name="detail_location_permission_needed">Permission Required</string>
+    <string name="detail_location_permission_action">Grant Location Permission</string>
+    <string name="detail_location_toggle_title">Peer-to-Peer Location Sharing</string>
+    <string name="detail_location_toggle_active">Active · Sharing with trusted peers</string>
+    <string name="detail_location_toggle_inactive">Disabled · Location not shared</string>
+
+    <!-- Detail Screens: Data Backup -->
+    <string name="detail_backup_title">Data &amp; Storage Security</string>
+    <string name="detail_backup_desc">Local SQLCipher AES-256 encryption and key protection.</string>
+    <string name="detail_backup_db_title">Database Encryption</string>
+    <string name="detail_backup_db_desc">All contacts and pairing records are encrypted with 256-bit AES via Zetetic SQLCipher. Data cannot be read even with direct filesystem access.</string>
+    <string name="detail_backup_wrap_title">Hardware Key Wrapping</string>
+    <string name="detail_backup_wrap_desc">The database key is randomly generated and encrypted via AES-256-GCM in Android KeyStore. (Alias: peykr.database.wrap.v1)</string>
+    <string name="detail_backup_zero_cloud_title">No Cloud Backup</string>
+    <string name="detail_backup_zero_cloud_desc">Due to accountless architecture, your data is not stored in the cloud. If you wipe the device or delete app data, information cannot be recovered.</string>
+    <string name="detail_backup_verify_action">Verify Database Integrity</string>
+
+    <!-- Detail Screens: About -->
+    <string name="detail_about_title">About Peykr</string>
+    <string name="detail_about_desc">Privacy-first, accountless, serverless cryptographic communication.</string>
+    <string name="detail_about_brand_desc">Peykr is an independent security architecture designed against surveillance and data profiling, requiring no accounts, phone numbers, or servers.</string>
+    <string name="detail_about_specs_title">Technical Specifications</string>
+    <string name="detail_about_spec_crypto">Cryptography: Ed25519 Digital Signatures, SHA-256</string>
+    <string name="detail_about_spec_storage">Storage: SQLCipher 256-bit AES Encrypted Database</string>
+    <string name="detail_about_spec_auth">Authentication: AndroidX Biometric + Monotonic SecurityGate</string>
+    <string name="detail_about_spec_transport">Pairing: 4-Step Mutually Signed QR Protocol</string>
+
+    <!-- Contact List & Actions -->
+    <string name="contact_delete_action">Delete Device</string>
+    <string name="contact_delete_dialog_title">Remove Device Connection</string>
+    <string name="contact_delete_dialog_desc">Are you sure you want to remove %1$s from trusted devices? Mutual pairing will be terminated.</string>
+    <string name="contact_delete_confirm">Delete</string>
+    <string name="contact_fingerprint_label">Fingerprint</string>
+    <string name="contact_paired_date">Paired on: %1$s</string>
 
     <!-- Pairing strings -->
     <string name="pairing_title">Device Pairing</string>

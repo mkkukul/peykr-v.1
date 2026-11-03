@@ -10,3 +10,13 @@ import kotlinx.serialization.Serializable
 @Serializable data object Settings : NavKey
 
 @Serializable data object PairingFlow : NavKey
+
+@Serializable data object DeviceIdentityDetail : NavKey
+
+@Serializable data object BiometricSettingsDetail : NavKey
+
+@Serializable data object LocationSharingDetail : NavKey
+
+@Serializable data object DataBackupDetail : NavKey
+
+@Serializable data object AboutDetail : NavKey

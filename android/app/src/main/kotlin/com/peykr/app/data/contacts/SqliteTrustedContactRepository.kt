@@ -23,6 +23,7 @@ class SqliteTrustedContactRepository(context: Context, databaseName: String = En
   private val databaseName = databaseName
   private val state = MutableStateFlow<List<TrustedContact>>(emptyList())
   private val initialization = MutableStateFlow(DatabaseState.INITIALIZING)
+  private val diagnostic = MutableStateFlow<String?>(null)
   private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   @Volatile private var database: SQLiteDatabase? = null
 
@@ -33,6 +34,8 @@ class SqliteTrustedContactRepository(context: Context, databaseName: String = En
   private fun startInitialization() {
     ioScope.launch {
       try {
+        android.util.Log.i("PeykrDatabase", "Starting initialization for database: $databaseName")
+        diagnostic.value = null
         val opened = EncryptedContactDatabase(databaseContext, databaseName).open()
         if (!isActive) { opened.close(); return@launch }
         synchronized(this@SqliteTrustedContactRepository) {
@@ -40,14 +43,19 @@ class SqliteTrustedContactRepository(context: Context, databaseName: String = En
         }
         state.value = readAll(opened)
         initialization.value = DatabaseState.READY
+        android.util.Log.i("PeykrDatabase", "Database initialization successful. Loaded ${state.value.size} contacts")
       } catch (error: Exception) {
-        initialization.value = (error as? DatabaseInitializationException)?.state ?: DatabaseState.KEY_INVALID
+        val resolvedState = (error as? DatabaseInitializationException)?.state ?: DatabaseState.KEY_INVALID
+        initialization.value = resolvedState
+        diagnostic.value = error.message ?: error.javaClass.simpleName
+        android.util.Log.e("PeykrDatabase", "Database initialization failed: state=$resolvedState, message=${error.message}", error)
       }
     }
   }
 
   override val contacts: Flow<List<TrustedContact>> = state
   override val initializationState: StateFlow<DatabaseState> = initialization
+  override val diagnosticDetails: StateFlow<String?> = diagnostic
 
   override fun retry() {
     synchronized(this) {
@@ -56,6 +64,7 @@ class SqliteTrustedContactRepository(context: Context, databaseName: String = En
       database = null
       current?.close()
       initialization.value = DatabaseState.INITIALIZING
+      diagnostic.value = null
     }
     startInitialization()
   }
