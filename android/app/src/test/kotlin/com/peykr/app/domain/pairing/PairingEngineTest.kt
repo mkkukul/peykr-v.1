@@ -322,6 +322,86 @@ class PairingEngineTest {
   }
 
   @Test
+  fun databaseException_duringResponderFinalization_throwsPersistenceFailure() = runTest {
+    val deviceA = TestDeviceIdentity("DeviceA")
+    val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val repoA = InMemoryContactRepository()
+    val engineA = DefaultPairingEngine(deviceA, gateA, repoA)
+
+    val deviceB = TestDeviceIdentity("DeviceB")
+    val gateB = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val intermittentRepo = object : TrustedContactRepository {
+      val contactsMap = mutableMapOf<String, TrustedContact>()
+      var failOnUpdate = false
+      override val contacts: Flow<List<TrustedContact>> = MutableStateFlow(emptyList())
+      override val initializationState: StateFlow<com.peykr.app.data.contacts.DatabaseState> = MutableStateFlow(com.peykr.app.data.contacts.DatabaseState.READY)
+      override fun retry() {}
+      override suspend fun getById(id: String): TrustedContact? = contactsMap[id]
+      override suspend fun add(contact: TrustedContact) {
+        if (failOnUpdate) throw RuntimeException("Disk full")
+        contactsMap[contact.id] = contact
+      }
+      override suspend fun update(contact: TrustedContact) {
+        if (failOnUpdate) throw RuntimeException("Disk full")
+        contactsMap[contact.id] = contact
+      }
+      override suspend fun delete(id: String) { contactsMap.remove(id) }
+    }
+    val engineB = DefaultPairingEngine(deviceB, gateB, intermittentRepo)
+
+    val sessionA = engineA.createInitiatorSession("Alice").getOrThrow()
+    val qr = engineA.generateQrPayload(sessionA).getOrThrow().serialize()
+
+    val tokenB = gateB.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig).getOrThrow()
+    val (sessionB, request) = engineB.processQrAndCreateRequest(qr, "Bob", tokenB).getOrThrow()
+
+    val sessionAWaiting = engineA.receivePairingRequest(sessionA, request).getOrThrow()
+    val tokenA = gateA.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig).getOrThrow()
+    val (_, response) = engineA.approvePairingRequest(sessionAWaiting, tokenA).getOrThrow()
+
+    // Trigger DB failure on finalization update
+    intermittentRepo.failOnUpdate = true
+    val finalizeResult = engineB.finalizeResponderPairing(sessionB, response)
+    assertTrue(finalizeResult.isFailure)
+    assertTrue(finalizeResult.exceptionOrNull() is PairingException.PersistenceFailure)
+    // Contact is still PENDING in repository, NOT PAIRED
+    assertEquals(PairingStatus.PENDING, intermittentRepo.getById(deviceA.deviceId)?.pairingStatus)
+  }
+
+  @Test
+  fun processRestart_withPendingSession_contactRemainsPending() = runTest {
+    val repo = InMemoryContactRepository()
+    val deviceA = TestDeviceIdentity("DeviceA")
+    val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val engineA1 = DefaultPairingEngine(deviceA, gateA, repo)
+
+    val deviceB = TestDeviceIdentity("DeviceB")
+    val gateB = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val engineB1 = DefaultPairingEngine(deviceB, gateB, InMemoryContactRepository())
+
+    val sessionA = engineA1.createInitiatorSession("Alice").getOrThrow()
+    val qr = engineA1.generateQrPayload(sessionA).getOrThrow().serialize()
+
+    val tokenB = gateB.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig).getOrThrow()
+    val (_, request) = engineB1.processQrAndCreateRequest(qr, "Bob", tokenB).getOrThrow()
+
+    engineA1.receivePairingRequest(sessionA, request).getOrThrow()
+
+    // Process crash occurs on device A.
+    // Create brand new engine instance representing process restart
+    val engineA2 = DefaultPairingEngine(deviceA, gateA, repo)
+
+    // Old in-memory session is gone
+    val retrieved = engineA2.getSession(sessionA.sessionId)
+    assertEquals(null, retrieved)
+
+    // Contact in persistent repository remains PENDING, never automatically PAIRED
+    val persistedContact = repo.getById(deviceB.deviceId)
+    assertNotNull(persistedContact)
+    assertEquals(PairingStatus.PENDING, persistedContact?.pairingStatus)
+  }
+
+  @Test
   fun invalidSignature_afterRetry_rejected() = runTest {
     val deviceA = TestDeviceIdentity("DeviceA")
     val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
