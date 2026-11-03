@@ -3,16 +3,30 @@ package com.peykr.app.core.identity
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.Signature
 import java.security.spec.ECGenParameterSpec
+import java.security.spec.X509EncodedKeySpec
+import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 internal interface KeyStoreGateway {
   fun loadKeyStore()
   fun containsAlias(alias: String): Boolean
   fun getPublicKey(alias: String): PublicKey?
+  fun getPrivateKey(alias: String): PrivateKey?
   fun deleteEntry(alias: String)
   fun generateKeyPair(alias: String): PublicKey
 }
@@ -29,6 +43,8 @@ internal class AndroidKeyStoreGateway : KeyStoreGateway {
   override fun containsAlias(alias: String): Boolean = keyStore.containsAlias(alias)
 
   override fun getPublicKey(alias: String): PublicKey? = keyStore.getCertificate(alias)?.publicKey
+
+  override fun getPrivateKey(alias: String): PrivateKey? = keyStore.getKey(alias, null) as? PrivateKey
 
   override fun deleteEntry(alias: String) {
     keyStore.deleteEntry(alias)
@@ -52,53 +68,135 @@ internal class AndroidKeyStoreGateway : KeyStoreGateway {
 }
 
 class AndroidKeyStoreDeviceIdentity internal constructor(
-  private val keyStoreGateway: KeyStoreGateway = AndroidKeyStoreGateway()
+  private val keyStoreGateway: KeyStoreGateway = AndroidKeyStoreGateway(),
+  private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : DeviceIdentity {
-  constructor() : this(AndroidKeyStoreGateway())
+  constructor() : this(AndroidKeyStoreGateway(), CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+  private val lock = Any()
+  private val _identityState = MutableStateFlow<DeviceIdentityState>(DeviceIdentityState.Initializing)
+  override val identityState: StateFlow<DeviceIdentityState> = _identityState.asStateFlow()
+
+  override fun initialize() {
+    synchronized(lock) {
+      if (_identityState.value is DeviceIdentityState.Ready || _identityState.value is DeviceIdentityState.IdentityInvalidated) return
+    }
+    coroutineScope.launch {
+      val result = getOrCreate()
+      _identityState.value = result.toState()
+    }
+  }
+
+  override fun retry() {
+    val current = _identityState.value
+    if (current is DeviceIdentityState.KeystoreUnavailable) {
+      coroutineScope.launch {
+        _identityState.value = DeviceIdentityState.Initializing
+        val result = getOrCreate()
+        _identityState.value = result.toState()
+      }
+    }
+  }
 
   override fun getOrCreate(): DeviceIdentityResult {
-    return try {
-      keyStoreGateway.loadKeyStore()
-      val entryExists = try {
-        keyStoreGateway.containsAlias(ALIAS)
-      } catch (e: Exception) {
-        return DeviceIdentityResult.KeystoreUnavailable(e)
-      }
-
-      if (entryExists) {
-        val existing = try {
-          keyStoreGateway.getPublicKey(ALIAS)
+    synchronized(lock) {
+      val result = try {
+        keyStoreGateway.loadKeyStore()
+        val entryExists = try {
+          keyStoreGateway.containsAlias(ALIAS)
         } catch (e: Exception) {
-          return DeviceIdentityResult.KeystoreUnavailable(e)
+          return DeviceIdentityResult.KeystoreUnavailable(e).also { _identityState.value = it.toState() }
         }
 
-        if (existing != null) {
-          DeviceIdentityResult.Success(info(existing.encoded))
-        } else {
-          DeviceIdentityResult.IdentityInvalidated(
-            "Device identity key entry exists in Keystore but its public certificate is missing or inaccessible."
-          )
-        }
-      } else {
-        if (!IdentityLossPolicy.canGenerateNewIdentity(keyExistsInStore = false)) {
-          DeviceIdentityResult.IdentityInvalidated("Identity generation prohibited by policy.")
-        } else {
-          val generated = try {
-            keyStoreGateway.generateKeyPair(ALIAS)
+        if (entryExists) {
+          val existing = try {
+            keyStoreGateway.getPublicKey(ALIAS)
           } catch (e: Exception) {
-            return DeviceIdentityResult.GenerationFailed(e)
+            return DeviceIdentityResult.KeystoreUnavailable(e).also { _identityState.value = it.toState() }
           }
-          DeviceIdentityResult.Success(info(generated.encoded))
+
+          if (existing != null) {
+            DeviceIdentityResult.Success(info(existing.encoded))
+          } else {
+            DeviceIdentityResult.IdentityInvalidated(
+              "Device identity key entry exists in Keystore but its public certificate is missing or inaccessible."
+            )
+          }
+        } else {
+          if (!IdentityLossPolicy.canGenerateNewIdentity(keyExistsInStore = false)) {
+            DeviceIdentityResult.IdentityInvalidated("Identity generation prohibited by policy.")
+          } else {
+            val generated = try {
+              keyStoreGateway.generateKeyPair(ALIAS)
+            } catch (e: Exception) {
+              return DeviceIdentityResult.GenerationFailed(e).also { _identityState.value = it.toState() }
+            }
+            DeviceIdentityResult.Success(info(generated.encoded))
+          }
         }
+      } catch (e: Exception) {
+        DeviceIdentityResult.KeystoreUnavailable(e)
       }
-    } catch (e: Exception) {
-      DeviceIdentityResult.KeystoreUnavailable(e)
+      _identityState.value = result.toState()
+      return result
     }
+  }
+
+  override fun sign(transcript: ByteArray): Result<ByteArray> {
+    return runCatching {
+      when (val currentState = _identityState.value) {
+        is DeviceIdentityState.Initializing -> throw DeviceIdentityException.KeyNotReady("Device identity is not ready (initializing)")
+        is DeviceIdentityState.KeystoreUnavailable -> throw DeviceIdentityException.KeystoreUnavailable("Keystore unavailable", currentState.cause)
+        is DeviceIdentityState.IdentityInvalidated -> throw DeviceIdentityException.IdentityInvalidated(currentState.message, currentState.cause)
+        is DeviceIdentityState.GenerationFailed -> throw DeviceIdentityException.KeyNotReady("Device identity generation failed")
+        is DeviceIdentityState.Ready -> { /* ready to sign */ }
+      }
+
+      val privateKey = try {
+        keyStoreGateway.getPrivateKey(ALIAS)
+      } catch (e: Exception) {
+        throw DeviceIdentityException.KeystoreUnavailable("Failed to retrieve private key from Keystore", e)
+      } ?: throw DeviceIdentityException.KeyNotReady("Device identity private key is missing or not accessible")
+
+      val signer = Signature.getInstance(SIGNATURE_ALGORITHM)
+      signer.initSign(privateKey)
+      signer.update(transcript)
+      signer.sign()
+    }
+  }
+
+  override fun verify(publicKeyBase64: String, transcript: ByteArray, signature: ByteArray): Boolean {
+    return try {
+      val decodedKey = decodeBase64(publicKeyBase64)
+      val keySpec = X509EncodedKeySpec(decodedKey)
+      val keyFactory = KeyFactory.getInstance("EC")
+      val publicKey = keyFactory.generatePublic(keySpec)
+      verify(publicKey, transcript, signature)
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
+  override fun verify(publicKey: PublicKey, transcript: ByteArray, signature: ByteArray): Boolean {
+    return try {
+      val verifier = Signature.getInstance(SIGNATURE_ALGORITHM)
+      verifier.initVerify(publicKey)
+      verifier.update(transcript)
+      verifier.verify(signature)
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
+  override fun close() {
+    coroutineScope.cancel()
   }
 
   private fun info(encodedPublicKey: ByteArray): DeviceIdentityInfo {
     val publicKey = encodeBase64(encodedPublicKey)
-    val id = MessageDigest.getInstance("SHA-256").digest(encodedPublicKey).joinToString("") { "%02x".format(it) }
+    val id = MessageDigest.getInstance("SHA-256").digest(encodedPublicKey).joinToString("") {
+      "%02x".format(Locale.US, it)
+    }
     return DeviceIdentityInfo(id, publicKey)
   }
 
@@ -110,7 +208,16 @@ class AndroidKeyStoreDeviceIdentity internal constructor(
     }
   }
 
+  private fun decodeBase64(input: String): ByteArray {
+    return try {
+      java.util.Base64.getDecoder().decode(input)
+    } catch (_: Throwable) {
+      Base64.decode(input, Base64.NO_WRAP)
+    }
+  }
+
   companion object {
     const val ALIAS = "peykr.device.identity.v1"
+    private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
   }
 }

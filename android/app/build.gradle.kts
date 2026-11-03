@@ -84,4 +84,5 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
   implementation(libs.sqlcipher.android)
   implementation(libs.androidx.sqlite)
+  implementation(libs.androidx.biometric)
 }
