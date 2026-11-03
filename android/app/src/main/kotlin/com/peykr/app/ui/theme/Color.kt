@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 
 val Navy950 = Color(0xFF050D1D)
 val Navy900 = Color(0xFF0A1730)
+val DarkPanel = Color(0xFF101A2A)
+val DividerDark = Color(0xFF243247)
 val Navy800 = Color(0xFF122344)
 val GlassWhite = Color(0x14FFFFFF)
 val GlassBorder = Color(0x24FFFFFF)
