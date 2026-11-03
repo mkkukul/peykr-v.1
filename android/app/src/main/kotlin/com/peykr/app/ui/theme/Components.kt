@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 val AppHorizontalPadding = 24.dp
-val GlassShape = RoundedCornerShape(22.dp)
+val GlassShape = RoundedCornerShape(20.dp)
 
 @Composable
 fun GlassCard(
@@ -40,44 +40,56 @@ fun GlassCard(
   onClick: (() -> Unit)? = null,
   content: @Composable () -> Unit,
 ) {
-  val clickableModifier = if (onClick == null) Modifier else Modifier
-    .clickable(onClick = onClick)
-    .semantics { role = Role.Button }
+  val interactionModifier = if (onClick == null) {
+    Modifier
+  } else {
+    Modifier
+      .clickable(onClick = onClick)
+      .semantics { role = Role.Button }
+  }
   Box(
     modifier = modifier
-      .then(clickableModifier)
+      .then(interactionModifier)
       .clip(GlassShape)
-      .background(Brush.linearGradient(listOf(Color(0x1CFFFFFF), Color(0x0BFFFFFF))))
+      .background(Color(0xB310182A))
       .border(BorderStroke(1.dp, GlassBorder), GlassShape)
-      .padding(18.dp),
+      .padding(16.dp),
   ) {
     content()
   }
 }
 
 @Composable
-fun GradientButton(
+fun PrimaryActionButton(
   text: String,
   onClick: () -> Unit,
+  enabled: Boolean = true,
   modifier: Modifier = Modifier,
 ) {
-  Surface(
+  val shape = RoundedCornerShape(16.dp)
+  Box(
     modifier = modifier
-      .height(56.dp)
-      .clip(RoundedCornerShape(18.dp))
-      .clickable(onClick = onClick),
-    color = Color.Transparent,
-    contentColor = Navy950,
+      .height(52.dp)
+      .clip(shape)
+      .background(
+        if (enabled) {
+          Brush.horizontalGradient(listOf(PrimaryTurquoise, Cyan))
+        } else {
+          Brush.horizontalGradient(listOf(Color(0xFF27354B), Color(0xFF1B273B)))
+        },
+      )
+      .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+      .semantics {
+        if (!enabled) contentDescription = "$text, kullanılamıyor"
+      },
+    contentAlignment = Alignment.Center,
   ) {
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .background(Brush.horizontalGradient(listOf(PrimaryTurquoise, Cyan, Violet)))
-        .padding(horizontal = 20.dp),
-      contentAlignment = Alignment.Center,
-    ) {
-      Text(text = text, fontWeight = FontWeight.Bold)
-    }
+    Text(
+      text = text,
+      color = if (enabled) Navy950 else TextMuted,
+      style = MaterialTheme.typography.labelLarge,
+      fontWeight = FontWeight.Bold,
+    )
   }
 }
 
@@ -90,14 +102,14 @@ fun StatusIndicator(
   Row(
     modifier = modifier,
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(7.dp),
   ) {
     Box(
       modifier = Modifier
-        .size(8.dp)
+        .size(7.dp)
         .background(if (active) SuccessGreen else TextMuted, CircleShape),
     )
-    Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = TextSecondary)
+    Text(label, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
   }
 }
 
@@ -108,10 +120,10 @@ fun SectionHeader(
   modifier: Modifier = Modifier,
 ) {
   Column(modifier = modifier) {
-    Text(title, style = androidx.compose.material3.MaterialTheme.typography.headlineSmall, color = TextPrimary)
+    Text(title, style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
     if (supportingText != null) {
       Spacer(Modifier.height(6.dp))
-      Text(supportingText, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, color = TextSecondary)
+      Text(supportingText, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
     }
   }
 }
@@ -119,19 +131,42 @@ fun SectionHeader(
 @Composable
 fun IconContainer(
   symbol: String,
-  contentDescription: String,
+  description: String,
   tint: Color = PrimaryTurquoise,
   modifier: Modifier = Modifier,
 ) {
   Box(
     modifier = modifier
-      .size(42.dp)
-      .clip(RoundedCornerShape(14.dp))
-      .background(tint.copy(alpha = 0.13f))
-      .semantics { this.contentDescription = contentDescription },
+      .size(40.dp)
+      .clip(RoundedCornerShape(12.dp))
+      .background(tint.copy(alpha = 0.12f))
+      .semantics { contentDescription = description },
     contentAlignment = Alignment.Center,
   ) {
-    Text(symbol, color = tint, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+    Text(symbol, color = tint, style = MaterialTheme.typography.titleMedium)
+  }
+}
+
+@Composable
+fun SettingsRow(
+  symbol: String,
+  title: String,
+  supportingText: String,
+  tint: Color,
+  enabled: Boolean = false,
+  onClick: (() -> Unit)? = null,
+) {
+  val effectiveClick = if (enabled) onClick else null
+  GlassCard(modifier = Modifier.fillMaxWidth(), onClick = effectiveClick) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      IconContainer(symbol, title, tint.copy(alpha = if (enabled) 1f else 0.7f))
+      Spacer(Modifier.width(13.dp))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+        Text(supportingText, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+      }
+      Text("›", color = TextMuted, style = MaterialTheme.typography.headlineSmall)
+    }
   }
 }
 
@@ -148,40 +183,23 @@ fun EmptyState(
   ) {
     Box(
       modifier = Modifier
-        .size(104.dp)
+        .size(112.dp)
         .clip(CircleShape)
-        .background(Brush.radialGradient(listOf(Purple.copy(alpha = 0.4f), Color.Transparent))),
+        .background(
+          Brush.radialGradient(
+            listOf(Color(0x3334D9FF), Color(0x101A526C), Color.Transparent),
+          ),
+        ),
       contentAlignment = Alignment.Center,
     ) {
-      Text("✦", color = PrimaryTurquoise, style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
+      Text("⌁", color = PrimaryTurquoise, style = MaterialTheme.typography.displaySmall)
     }
-    Text(title, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, color = TextPrimary)
+    Text(title, style = MaterialTheme.typography.titleLarge, color = TextPrimary)
     Text(
       supportingText,
-      style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+      style = MaterialTheme.typography.bodyMedium,
       color = TextSecondary,
-      modifier = Modifier.padding(horizontal = 18.dp),
+      modifier = Modifier.padding(horizontal = 24.dp),
     )
-  }
-}
-
-@Composable
-fun SettingsRow(
-  symbol: String,
-  title: String,
-  supportingText: String,
-  tint: Color,
-  onClick: (() -> Unit)? = null,
-) {
-  GlassCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      IconContainer(symbol, title, tint)
-      Spacer(Modifier.width(14.dp))
-      Column(modifier = Modifier.weight(1f)) {
-        Text(title, style = androidx.compose.material3.MaterialTheme.typography.titleMedium, color = TextPrimary)
-        Text(supportingText, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, color = TextSecondary)
-      }
-      Text("›", color = TextMuted, style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
-    }
   }
 }

@@ -1,6 +1,5 @@
 package com.peykr.app.ui.main
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,13 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,10 +50,10 @@ import com.peykr.app.ui.theme.Cyan
 import com.peykr.app.ui.theme.EmptyState
 import com.peykr.app.ui.theme.GlassCard
 import com.peykr.app.ui.theme.GlassShape
-import com.peykr.app.ui.theme.GradientButton
 import com.peykr.app.ui.theme.IconContainer
 import com.peykr.app.ui.theme.Navy950
 import com.peykr.app.ui.theme.Navy900
+import com.peykr.app.ui.theme.PrimaryActionButton
 import com.peykr.app.ui.theme.PrimaryTurquoise
 import com.peykr.app.ui.theme.Purple
 import com.peykr.app.ui.theme.SectionHeader
@@ -76,14 +78,14 @@ fun MainScreen(
   Scaffold(
     modifier = modifier,
     containerColor = Navy950,
+    contentWindowInsets = WindowInsets.safeDrawing,
     bottomBar = {
-      BottomNavigationBar(current = Main, onNavigate = onNavigate)
+      PEYKRBottomNavigation(current = Main, onNavigate = onNavigate)
     },
   ) { innerPadding ->
     HomeContent(
       trustedPeopleCount = trustedPeople.size,
       onPeopleClick = onPeopleClick,
-      onAddPerson = onPeopleClick,
       onSettingsClick = onSettingsClick,
       modifier = Modifier.padding(innerPadding),
     )
@@ -94,21 +96,20 @@ fun MainScreen(
 private fun HomeContent(
   trustedPeopleCount: Int,
   onPeopleClick: () -> Unit,
-  onAddPerson: () -> Unit,
   onSettingsClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  AppBackground(modifier = modifier) {
+  AppBackground(modifier) {
     Column(
       modifier = Modifier
         .fillMaxSize()
         .verticalScroll(rememberScrollState())
         .padding(horizontal = AppHorizontalPadding)
-        .padding(top = 22.dp, bottom = 28.dp),
-      verticalArrangement = Arrangement.spacedBy(20.dp),
+        .padding(top = 20.dp),
+      verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-      BrandHeader()
-      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      PEYKRBrandHeader()
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Güvendesiniz.", style = MaterialTheme.typography.displaySmall, color = TextPrimary)
         Text(
           "Bağlantılarınızı yönetin, konum paylaşımını dilediğiniz gibi kontrol edin.",
@@ -116,48 +117,32 @@ private fun HomeContent(
           color = TextSecondary,
         )
       }
+      SecurityStatusCard()
       SecurityIllustration()
-      GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          IconContainer("◌", "Prototip durumu", Violet)
-          Spacer(Modifier.width(14.dp))
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Prototip sürüm", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-            Text("Güvenlik özellikleri henüz etkin değil.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-          }
-          Text("BETA", color = Violet, style = MaterialTheme.typography.labelLarge)
-        }
-      }
       Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        InfoCard(
-          title = "Güvenilir Kişiler",
-          value = trustedPeopleCount.toString(),
-          symbol = "◉",
-          tint = PrimaryTurquoise,
-          modifier = Modifier.weight(1f),
+        TrustedPeopleSummary(
+          count = trustedPeopleCount,
           onClick = onPeopleClick,
-        )
-        InfoCard(
-          title = "Konum Paylaşımı",
-          value = "Kapalı",
-          symbol = "⌖",
-          tint = Cyan,
           modifier = Modifier.weight(1f),
+        )
+        LocationStatusCard(
           onClick = onSettingsClick,
+          modifier = Modifier.weight(1f),
         )
       }
-      GradientButton(text = "Güvenilir Kişi Ekle", onClick = onAddPerson, modifier = Modifier.fillMaxWidth())
+      QuickActions(onPeopleClick = onPeopleClick, onSettingsClick = onSettingsClick)
+      Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
   }
 }
 
 @Composable
-private fun BrandHeader() {
+private fun PEYKRBrandHeader() {
   Row(verticalAlignment = Alignment.CenterVertically) {
     Box(
       modifier = Modifier
-        .size(40.dp)
-        .clip(RoundedCornerShape(13.dp))
+        .size(38.dp)
+        .clip(RoundedCornerShape(12.dp))
         .background(Brush.linearGradient(listOf(PrimaryTurquoise, Violet))),
       contentAlignment = Alignment.Center,
     ) {
@@ -171,50 +156,122 @@ private fun BrandHeader() {
 }
 
 @Composable
-private fun SecurityIllustration(modifier: Modifier = Modifier) {
-  Box(
-    modifier = modifier
-      .fillMaxWidth()
-      .height(190.dp)
-      .clip(GlassShape)
-      .background(Brush.radialGradient(listOf(Color(0x302B93B6), Color(0x100C1F3E), Navy900)))
-      .semantics { contentDescription = "Soyut güvenlik ve güven illüstrasyonu" },
-    contentAlignment = Alignment.Center,
-  ) {
-    Canvas(Modifier.size(170.dp)) {
-      val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
-      drawCircle(Color(0x1834D9FF), radius = 72.dp.toPx())
-      drawCircle(Color(0x145D42C4), radius = 54.dp.toPx())
-      drawArc(
-        brush = Brush.sweepGradient(listOf(PrimaryTurquoise, Violet, PrimaryTurquoise)),
-        startAngle = -45f,
-        sweepAngle = 280f,
-        useCenter = false,
-        style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
-      )
-      drawCircle(Color(0xFF112B50), radius = 36.dp.toPx())
-      drawCircle(PrimaryTurquoise, radius = 30.dp.toPx(), style = Stroke(width = 2.dp.toPx()))
-      drawLine(PrimaryTurquoise, center - androidx.compose.ui.geometry.Offset(0f, 4.dp.toPx()), center + androidx.compose.ui.geometry.Offset(0f, 18.dp.toPx()), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
-      drawLine(PrimaryTurquoise, center - androidx.compose.ui.geometry.Offset(0f, 4.dp.toPx()), center - androidx.compose.ui.geometry.Offset(0f, 18.dp.toPx()), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+private fun SecurityStatusCard() {
+  GlassCard(modifier = Modifier.fillMaxWidth()) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(
+        modifier = Modifier
+          .size(48.dp)
+          .clip(CircleShape)
+          .background(Color(0x1234D9FF)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text("◌", color = Cyan, style = MaterialTheme.typography.headlineSmall)
+      }
+      Spacer(Modifier.width(14.dp))
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Sistem durumu", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text("Prototip", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
+      }
+      Column(horizontalAlignment = Alignment.End) {
+        Text("HAZIRLANIYOR", color = Violet, style = MaterialTheme.typography.labelSmall)
+        Text("Aktif değil", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+      }
     }
   }
 }
 
 @Composable
-private fun InfoCard(
-  title: String,
-  value: String,
-  symbol: String,
-  tint: Color,
-  modifier: Modifier = Modifier,
-  onClick: () -> Unit,
-) {
-  GlassCard(modifier = modifier.animateContentSize(), onClick = onClick) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-      IconContainer(symbol, title, tint)
-      Text(title, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-      Text(value, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+private fun SecurityIllustration(modifier: Modifier = Modifier) {
+  Box(
+    modifier = modifier
+      .fillMaxWidth()
+      .height(164.dp)
+      .clip(GlassShape)
+      .background(
+        Brush.radialGradient(
+          listOf(Color(0x1B00E5D4), Color(0x0C273E62), Navy900),
+        ),
+      )
+      .semantics { contentDescription = "Soyut, etkin olmayan güvenlik illüstrasyonu" },
+    contentAlignment = Alignment.Center,
+  ) {
+    Canvas(Modifier.size(150.dp)) {
+      val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+      drawCircle(Color(0x0F00E5D4), radius = 68.dp.toPx())
+      drawArc(
+        brush = Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent, Violet)),
+        startAngle = 210f,
+        sweepAngle = 250f,
+        useCenter = false,
+        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+      )
+      drawCircle(Color(0xFF12223C), radius = 35.dp.toPx())
+      drawCircle(Color(0xFF29435C), radius = 28.dp.toPx(), style = Stroke(width = 1.5.dp.toPx()))
+      drawLine(
+        color = PrimaryTurquoise,
+        start = center - androidx.compose.ui.geometry.Offset(0f, 3.dp.toPx()),
+        end = center + androidx.compose.ui.geometry.Offset(0f, 14.dp.toPx()),
+        strokeWidth = 2.5.dp.toPx(),
+        cap = StrokeCap.Round,
+      )
+      drawLine(
+        color = PrimaryTurquoise,
+        start = center - androidx.compose.ui.geometry.Offset(0f, 3.dp.toPx()),
+        end = center - androidx.compose.ui.geometry.Offset(0f, 14.dp.toPx()),
+        strokeWidth = 2.5.dp.toPx(),
+        cap = StrokeCap.Round,
+      )
     }
+  }
+}
+
+@Composable
+private fun TrustedPeopleSummary(count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  GlassCard(modifier = modifier, onClick = onClick) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      IconContainer("◉", "Güvenilir kişiler", PrimaryTurquoise)
+      Text("Güvenilir kişiler", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+      Text("$count kişi", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+    }
+  }
+}
+
+@Composable
+private fun LocationStatusCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+  GlassCard(modifier = modifier, onClick = onClick) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      IconContainer("⌖", "Konum paylaşımı", Cyan)
+      Text("Konum paylaşımı", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+      Text("Kapalı", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+    }
+  }
+}
+
+@Composable
+private fun QuickActions(onPeopleClick: () -> Unit, onSettingsClick: () -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Text("Hızlı erişim", color = TextMuted, style = MaterialTheme.typography.labelLarge)
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      QuickAction("Kişileri yönet", "›", onPeopleClick, Modifier.weight(1f))
+      QuickAction("Ayarlar", "›", onSettingsClick, Modifier.weight(1f))
+    }
+  }
+}
+
+@Composable
+private fun QuickAction(label: String, symbol: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  Row(
+    modifier = modifier
+      .clip(RoundedCornerShape(14.dp))
+      .background(Color(0x6610182A))
+      .clickable(onClick = onClick)
+      .padding(horizontal = 14.dp, vertical = 13.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    Text(label, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+    Text(symbol, color = PrimaryTurquoise, style = MaterialTheme.typography.titleMedium)
   }
 }
 
@@ -230,27 +287,42 @@ fun TrustedPeopleScreen(
   Scaffold(
     modifier = modifier,
     containerColor = Navy950,
-    bottomBar = { BottomNavigationBar(current = TrustedPeople, onNavigate = onNavigate) },
+    contentWindowInsets = WindowInsets.safeDrawing,
+    bottomBar = { PEYKRBottomNavigation(current = TrustedPeople, onNavigate = onNavigate) },
   ) { innerPadding ->
-    AppBackground(modifier = Modifier.padding(innerPadding)) {
+    AppBackground(Modifier.padding(innerPadding)) {
       Column(
         modifier = Modifier
           .fillMaxSize()
           .verticalScroll(rememberScrollState())
           .padding(horizontal = AppHorizontalPadding)
-          .padding(top = 22.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
+          .padding(top = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
       ) {
         ScreenHeader("Güvenilir Kişiler", "Güvendiğiniz kişileri ekleyin ve bağlantılarınızı yönetin.", onBack)
         if (people.isEmpty()) {
           EmptyState(
             title = "Henüz güvenilir kişi yok.",
-            supportingText = "Aileniz, yakınlarınız veya güvendiğiniz cihazları ekleyin.",
-            modifier = Modifier.padding(top = 38.dp),
+            supportingText = "Güvenilir bir ilişki, iki cihaz sahibinin açık onayıyla kurulacaktır.",
+            modifier = Modifier.padding(top = 28.dp),
           )
           GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Text("Ekleme akışı prototip aşamasında.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              IconContainer("i", "Prototip bilgisi", Violet)
+              Spacer(Modifier.width(12.dp))
+              Text(
+                "Kişi ekleme akışı prototipte henüz kullanılamıyor.",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+              )
+            }
           }
+          PrimaryActionButton(
+            text = "+ Kişi Ekle · Yakında",
+            onClick = {},
+            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
+          )
         } else {
           people.forEach { person ->
             GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -258,7 +330,7 @@ fun TrustedPeopleScreen(
             }
           }
         }
-        GradientButton(text = "+ Kişi Ekle", onClick = { }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
       }
     }
   }
@@ -273,34 +345,52 @@ fun SettingsScreen(
   Scaffold(
     modifier = modifier,
     containerColor = Navy950,
-    bottomBar = { BottomNavigationBar(current = Settings, onNavigate = onNavigate) },
+    contentWindowInsets = WindowInsets.safeDrawing,
+    bottomBar = { PEYKRBottomNavigation(current = Settings, onNavigate = onNavigate) },
   ) { innerPadding ->
-    AppBackground(modifier = Modifier.padding(innerPadding)) {
+    AppBackground(Modifier.padding(innerPadding)) {
       Column(
         modifier = Modifier
           .fillMaxSize()
           .verticalScroll(rememberScrollState())
           .padding(horizontal = AppHorizontalPadding)
-          .padding(top = 22.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+          .padding(top = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
         ScreenHeader("Ayarlar", "PEYKR deneyiminizi ve izinlerinizi yönetin.", onBack)
-        SettingsSectionTitle("Uygulama")
-        SettingsRow("P", "Prototip Sürüm", "Özellikler geliştirme aşamasında.", Violet)
-        SettingsRow("i", "Hakkında", "PEYKR V.1 · Gizlilik odaklı iletişim.", Cyan)
-        SettingsSectionTitle("Bildirimler")
-        SettingsRow("•", "Bildirimler", "Bildirim ayarları henüz uygulanmadı.", TextMuted)
-        SettingsSectionTitle("Gizlilik")
-        SettingsRow("⌖", "Konum Paylaşımı", "Kapalı · Her kişi için ayrı izin gerekir.", PrimaryTurquoise)
-        SettingsRow("◌", "Gizlilik", "Hesap, kurtarma ve bulut yedekleme yok.", Purple)
+        SettingsSection("Görünüm") {
+          SettingsRow("◐", "Tema", "Koyu tema · Tasarım önceliği", Cyan)
+        }
+        SettingsSection("Dil") {
+          SettingsRow("文", "Uygulama dili", "Türkçe · Değiştirme henüz kullanılamıyor", Violet)
+        }
+        SettingsSection("Gizlilik") {
+          SettingsRow("⌖", "Konum paylaşımı", "Kapalı · Kişi başına ayrı izin gerekir", PrimaryTurquoise)
+          SettingsRow("◌", "Veri ve yedekleme", "Bulut yedekleme ve hesap kurtarma yok", Purple)
+        }
+        SettingsSection("Güvenlik") {
+          SettingsRow("◇", "Cihaz doğrulama", "İşletim sistemi kimlik doğrulaması planlandı", Violet)
+        }
+        SettingsSection("PEYKR hakkında") {
+          SettingsRow("i", "Prototip sürüm", "PEYKR V.1 · Özellikler geliştirme aşamasında", Cyan)
+        }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
       }
     }
   }
 }
 
 @Composable
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(title, color = TextMuted, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp))
+    content()
+  }
+}
+
+@Composable
 private fun ScreenHeader(title: String, supportingText: String, onBack: () -> Unit) {
-  Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+  Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
     Text(
       "‹  Geri",
       color = PrimaryTurquoise,
@@ -314,49 +404,32 @@ private fun ScreenHeader(title: String, supportingText: String, onBack: () -> Un
 }
 
 @Composable
-private fun SettingsSectionTitle(title: String) {
-  Text(
-    title.uppercase(),
-    color = TextMuted,
-    style = MaterialTheme.typography.labelLarge,
-    modifier = Modifier.padding(top = 14.dp, bottom = 2.dp),
-  )
-}
-
-@Composable
 private fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
   Box(
     modifier = modifier
       .fillMaxSize()
       .background(
-        Brush.verticalGradient(
-          listOf(Navy950, Color(0xFF07152D), Navy950),
-        ),
+        Brush.verticalGradient(listOf(Navy950, Color(0xFF0A1222), Navy950)),
       ),
   ) {
     Box(
       modifier = Modifier
         .align(Alignment.TopEnd)
-        .size(210.dp)
-        .background(Brush.radialGradient(listOf(Purple.copy(alpha = 0.12f), Color.Transparent))),
+        .size(180.dp)
+        .background(Brush.radialGradient(listOf(Color(0x143C6E9E), Color.Transparent))),
     )
     content()
   }
 }
 
 @Composable
-private fun BottomNavigationBar(
-  current: NavKey,
-  onNavigate: (NavKey) -> Unit,
-) {
+private fun PEYKRBottomNavigation(current: NavKey, onNavigate: (NavKey) -> Unit) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .navigationBarsPadding()
-      .padding(horizontal = 18.dp, vertical = 10.dp)
-      .clip(RoundedCornerShape(24.dp))
-      .background(Color(0xE6102342))
-      .padding(8.dp),
+      .background(Color(0xF20A1222))
+      .padding(horizontal = 14.dp, vertical = 8.dp)
+      .windowInsetsBottomHeight(WindowInsets.navigationBars),
     horizontalArrangement = Arrangement.SpaceEvenly,
   ) {
     NavigationItem("⌂", "Ana Sayfa", current == Main) { onNavigate(Main) }
@@ -369,15 +442,20 @@ private fun BottomNavigationBar(
 private fun NavigationItem(symbol: String, label: String, selected: Boolean, onClick: () -> Unit) {
   Column(
     modifier = Modifier
-      .clip(RoundedCornerShape(16.dp))
-      .background(if (selected) Color(0x1F00E5D4) else Color.Transparent)
-      .padding(horizontal = 18.dp, vertical = 8.dp)
+      .clip(RoundedCornerShape(14.dp))
       .clickable(onClick = onClick)
+      .padding(horizontal = 16.dp, vertical = 7.dp)
       .semantics { contentDescription = label },
     horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
+    Box(
+      modifier = Modifier
+        .size(if (selected) 5.dp else 0.dp)
+        .background(PrimaryTurquoise, CircleShape),
+    )
     Text(symbol, color = if (selected) PrimaryTurquoise else TextMuted, style = MaterialTheme.typography.titleMedium)
-    Text(label, color = if (selected) TextPrimary else TextMuted, style = MaterialTheme.typography.labelLarge)
+    Text(label, color = if (selected) TextPrimary else TextMuted, style = MaterialTheme.typography.labelSmall)
   }
 }
 
@@ -390,17 +468,12 @@ internal fun MainScreen(data: List<String>, modifier: Modifier = Modifier) {
 
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
-  Text(text = "Hello $name!", modifier = modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
+  Text("Hello $name!", modifier = modifier.padding(16.dp), style = MaterialTheme.typography.bodyLarge)
 }
 
 @Composable
 fun MainScreenPreview() {
   PEYKRTheme {
-    HomeContent(
-      trustedPeopleCount = 0,
-      onPeopleClick = {},
-      onAddPerson = {},
-      onSettingsClick = {},
-    )
+    HomeContent(trustedPeopleCount = 0, onPeopleClick = {}, onSettingsClick = {})
   }
 }
