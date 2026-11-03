@@ -204,4 +204,7 @@
     <string name="camera_permission_required_desc">Karekod tarayarak güvenli cihaz eşleştirmesi yapabilmek için kamera izni gereklidir.</string>
     <string name="camera_permission_grant">Kamera İzni Ver</string>
     <string name="camera_permission_settings">Uygulama Ayarları</string>
+    <string name="camera_init_failed_title">Kamera Başlatılamadı</string>
+    <string name="camera_init_failed_desc">Kamera donanımına erişilemedi veya başka bir uygulama tarafından kullanılıyor.</string>
+    <string name="camera_init_retry">Kamerayı Yeniden Başlat</string>
 </resources>

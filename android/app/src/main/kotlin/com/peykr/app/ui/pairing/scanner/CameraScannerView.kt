@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,19 +33,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.peykr.app.R
 import com.peykr.app.ui.theme.Navy950
@@ -68,78 +70,132 @@ fun CameraScannerView(
     )
   }
 
-  var permissionRequestedOnce by remember { mutableStateOf(false) }
-
-  val permissionLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.RequestPermission()
-  ) { granted ->
-    hasCameraPermission = granted
-    permissionRequestedOnce = true
+  // Refresh permission when resuming from app settings or background
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+          context,
+          Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
+    }
   }
 
-  LaunchedEffect(Unit) {
-    if (!hasCameraPermission) {
+  var cameraBindingError by remember { mutableStateOf<String?>(null) }
+  var retryKey by remember { mutableIntStateOf(0) }
+
+  val registryOwner = LocalActivityResultRegistryOwner.current
+  val permissionLauncher = if (registryOwner != null) {
+    rememberLauncherForActivityResult(
+      contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+      hasCameraPermission = granted
+    }
+  } else null
+
+  LaunchedEffect(hasCameraPermission, registryOwner) {
+    if (!hasCameraPermission && permissionLauncher != null) {
       permissionLauncher.launch(Manifest.permission.CAMERA)
     }
   }
 
   Box(modifier = modifier.fillMaxSize().background(Navy950), contentAlignment = Alignment.Center) {
     if (hasCameraPermission) {
-      val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-      val analyzer = remember { QrCodeAnalyzer(onQrCodeScanned) }
-
-      AndroidView(
-        factory = { ctx ->
-          val previewView = PreviewView(ctx).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
+      if (cameraBindingError != null) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+        ) {
+          Text(
+            text = stringResource(R.string.camera_init_failed_title),
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+          )
+          Spacer(Modifier.height(8.dp))
+          Text(
+            text = stringResource(R.string.camera_init_failed_desc),
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+          )
+          Spacer(Modifier.height(16.dp))
+          Button(
+            onClick = {
+              cameraBindingError = null
+              retryKey++
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
+          ) {
+            Text(stringResource(R.string.camera_init_retry), color = Navy950)
           }
+        }
+      } else {
+        val cameraExecutor = remember(retryKey) { Executors.newSingleThreadExecutor() }
+        val analyzer = remember(retryKey) { QrCodeAnalyzer(onQrCodeScanned) }
+        var activeCameraProvider by remember(retryKey) { mutableStateOf<ProcessCameraProvider?>(null) }
 
-          val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-          cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-
-            val preview = Preview.Builder().build().also {
-              it.setSurfaceProvider(previewView.surfaceProvider)
+        AndroidView(
+          factory = { ctx ->
+            val previewView = PreviewView(ctx).apply {
+              scaleType = PreviewView.ScaleType.FILL_CENTER
             }
 
-            val imageAnalysis = ImageAnalysis.Builder()
-              .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-              .build()
-              .also {
-                it.setAnalyzer(cameraExecutor, analyzer)
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+            cameraProviderFuture.addListener({
+              try {
+                val cameraProvider = cameraProviderFuture.get()
+                activeCameraProvider = cameraProvider
+
+                val preview = Preview.Builder().build().also {
+                  it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+                val imageAnalysis = ImageAnalysis.Builder()
+                  .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                  .build()
+                  .also {
+                    it.setAnalyzer(cameraExecutor, analyzer)
+                  }
+
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                  lifecycleOwner,
+                  cameraSelector,
+                  preview,
+                  imageAnalysis,
+                )
+              } catch (e: Exception) {
+                cameraBindingError = e.message ?: "Camera binding failed"
               }
+            }, ContextCompat.getMainExecutor(ctx))
 
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            previewView
+          },
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(340.dp)
+            .clip(RoundedCornerShape(16.dp)),
+        )
 
+        DisposableEffect(retryKey) {
+          onDispose {
             try {
-              cameraProvider.unbindAll()
-              cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                imageAnalysis,
-              )
-            } catch (_: Exception) {
-              // Camera binding failure handled by graceful lifecycle fallback
-            }
-          }, ContextCompat.getMainExecutor(ctx))
-
-          previewView
-        },
-        modifier = Modifier
-          .fillMaxWidth()
-          .height(340.dp)
-          .clip(RoundedCornerShape(16.dp)),
-      )
-
-      DisposableEffect(Unit) {
-        onDispose {
-          try {
-            val cameraProvider = ProcessCameraProvider.getInstance(context).get()
-            cameraProvider.unbindAll()
-          } catch (_: Exception) {}
-          analyzer.close()
-          cameraExecutor.shutdown()
+              activeCameraProvider?.unbindAll()
+            } catch (_: Exception) {}
+            analyzer.close()
+            cameraExecutor.shutdown()
+          }
         }
       }
     } else {
@@ -166,7 +222,8 @@ fun CameraScannerView(
         Spacer(Modifier.height(16.dp))
 
         Button(
-          onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+          onClick = { permissionLauncher?.launch(Manifest.permission.CAMERA) },
+          enabled = permissionLauncher != null,
           colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
         ) {
           Text(stringResource(R.string.camera_permission_grant), color = Navy950)

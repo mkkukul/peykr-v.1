@@ -1,8 +1,15 @@
 package com.peykr.app
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.res.AssetManager
+import android.content.res.Resources
 import android.os.Bundle
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultRegistry
+import androidx.activity.result.ActivityResultRegistryOwner
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,9 +37,13 @@ class MainActivity : FragmentActivity() {
       val localizedContext = remember(language) {
         val configuration = android.content.res.Configuration(resources.configuration)
         configuration.setLocale(Locale.forLanguageTag(language.languageTag))
-        createConfigurationContext(configuration)
+        val configContext = createConfigurationContext(configuration)
+        LocalizedActivityContext(this@MainActivity, configContext)
       }
-      CompositionLocalProvider(LocalContext provides localizedContext) {
+      CompositionLocalProvider(
+        LocalContext provides localizedContext,
+        LocalActivityResultRegistryOwner provides this@MainActivity,
+      ) {
         PEYKRTheme(darkTheme = true) {
           Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             MainNavigation(language, onLanguageSelected = { languageStore.save(it); language = it })
@@ -40,5 +51,15 @@ class MainActivity : FragmentActivity() {
         }
       }
     }
+  }
+
+  private class LocalizedActivityContext(
+    baseActivity: FragmentActivity,
+    private val localizedContext: Context
+  ) : ContextWrapper(baseActivity), ActivityResultRegistryOwner {
+    override fun getResources(): Resources = localizedContext.resources
+    override fun getAssets(): AssetManager = localizedContext.assets
+    override val activityResultRegistry: ActivityResultRegistry
+      get() = (baseContext as FragmentActivity).activityResultRegistry
   }
 }
