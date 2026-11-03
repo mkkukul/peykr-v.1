@@ -8,9 +8,10 @@ import androidx.navigation3.ui.NavDisplay
 import com.peykr.app.ui.main.MainScreen
 import com.peykr.app.ui.main.SettingsScreen
 import com.peykr.app.ui.main.TrustedPeopleScreen
+import com.peykr.app.localization.AppLanguage
 
 @Composable
-fun MainNavigation() {
+fun MainNavigation(language: AppLanguage, onLanguageSelected: (AppLanguage) -> Unit) {
   val backStack = rememberNavBackStack(Main)
   fun navigateTo(key: NavKey) {
     if (backStack.lastOrNull() == key) return
@@ -40,6 +41,8 @@ fun MainNavigation() {
             SettingsScreen(
               onNavigate = ::navigateTo,
               onBack = { backStack.removeLastOrNull() },
+              selectedLanguage = language,
+              onLanguageSelected = onLanguageSelected,
             )
           }
         },

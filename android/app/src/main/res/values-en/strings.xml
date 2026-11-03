@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PEYKR</string>
+    <string name="prototype_label">PROTOTYPE</string>
+    <string name="home_kicker">PEYKR prototype</string>
+    <string name="home_headline">Safety features are not active yet.</string>
+    <string name="home_description">This version presents the core interface only.</string>
+    <string name="system_status">System status</string>
+    <string name="system_status_value">In preparation · Inactive</string>
+    <string name="trusted_people">Trusted people</string>
+    <string name="trusted_people_count">%1$d people</string>
+    <string name="location_sharing">Location sharing</string>
+    <string name="location_off">Off</string>
+    <string name="view_action">View</string>
+    <string name="trusted_people_description">View trusted people locally in this prototype.</string>
+    <string name="trusted_people_empty_title">No trusted people yet</string>
+    <string name="trusted_people_empty_description">Pairing and invitation flows are not available yet.</string>
+    <string name="trusted_people_privacy_note">No real people or contact details are added.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_description">PEYKR preferences and privacy approach.</string>
+    <string name="appearance_section">Appearance</string>
+    <string name="theme_setting">Theme</string>
+    <string name="theme_detail">Dark theme · Design priority</string>
+    <string name="language_section">Language</string>
+    <string name="language_setting">App language</string>
+    <string name="privacy_section">Privacy</string>
+    <string name="location_detail">Off · Feature is not active yet</string>
+    <string name="backup_setting">Data and backup</string>
+    <string name="backup_detail">No cloud backup or account recovery</string>
+    <string name="security_section">Security</string>
+    <string name="device_verification">Device verification</string>
+    <string name="device_verification_detail">Operating system verification is planned</string>
+    <string name="about_section">About</string>
+    <string name="prototype_version">Prototype version</string>
+    <string name="prototype_version_detail">PEYKR V.1 · In development</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_english">English</string>
+    <string name="back_action">Back</string>
+    <string name="navigation_home">Home</string>
+    <string name="navigation_people">People</string>
+    <string name="navigation_settings">Settings</string>
+</resources>
