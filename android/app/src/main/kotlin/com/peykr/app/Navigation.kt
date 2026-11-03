@@ -1,14 +1,12 @@
 package com.peykr.app
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.peykr.app.ui.main.MainScreen
+import com.peykr.app.ui.main.SettingsScreen
+import com.peykr.app.ui.main.TrustedPeopleScreen
 
 @Composable
 fun MainNavigation() {
@@ -20,8 +18,24 @@ fun MainNavigation() {
     entryProvider =
       entryProvider {
         entry<Main> {
-          MainScreen(onItemClick = { navKey -> backStack.add(navKey) })
-        }
-      },
+            MainScreen(
+              onNavigate = { navKey -> backStack.add(navKey) },
+              onPeopleClick = { backStack.add(TrustedPeople) },
+              onSettingsClick = { backStack.add(Settings) },
+            )
+          }
+          entry<TrustedPeople> {
+            TrustedPeopleScreen(
+              onNavigate = { navKey -> backStack.add(navKey) },
+              onBack = { backStack.removeLastOrNull() },
+            )
+          }
+          entry<Settings> {
+            SettingsScreen(
+              onNavigate = { navKey -> backStack.add(navKey) },
+              onBack = { backStack.removeLastOrNull() },
+            )
+          }
+        },
   )
 }
