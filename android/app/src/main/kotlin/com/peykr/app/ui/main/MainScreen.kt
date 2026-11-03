@@ -2,9 +2,11 @@ package com.peykr.app.ui.main
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -15,21 +17,21 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -46,118 +48,78 @@ import com.peykr.app.TrustedPeople
 import com.peykr.app.data.DefaultDataRepository
 import com.peykr.app.ui.theme.AppHorizontalPadding
 import com.peykr.app.ui.theme.Cyan
-import com.peykr.app.ui.theme.DarkPanel
 import com.peykr.app.ui.theme.DividerDark
-import com.peykr.app.ui.theme.GlassCard
-import com.peykr.app.ui.theme.IconContainer
 import com.peykr.app.ui.theme.Navy950
 import com.peykr.app.ui.theme.PrimaryTurquoise
-import com.peykr.app.ui.theme.Purple
 import com.peykr.app.ui.theme.SectionHeader
-import com.peykr.app.ui.theme.SettingsRow
 import com.peykr.app.ui.theme.TextMuted
 import com.peykr.app.ui.theme.TextPrimary
 import com.peykr.app.ui.theme.TextSecondary
-import com.peykr.app.ui.theme.Violet
 
 @Composable
 fun MainScreen(onNavigate: (NavKey) -> Unit, onPeopleClick: () -> Unit, onSettingsClick: () -> Unit, modifier: Modifier = Modifier, viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(DefaultDataRepository()) }) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val count = (uiState as? MainScreenUiState.Success)?.data?.size ?: 0
   Scaffold(modifier, containerColor = Navy950, contentWindowInsets = WindowInsets.safeDrawing, bottomBar = { PEYKRBottomNavigation(Main, onNavigate) }) { padding ->
-    AppBackground(Modifier.padding(padding)) { HomeContent(count, onPeopleClick, onSettingsClick) }
-  }
-}
-
-@Composable
-private fun HomeContent(count: Int, onPeopleClick: () -> Unit, onSettingsClick: () -> Unit) {
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AppHorizontalPadding).padding(top = 22.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-    BrandHeader()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text("PEYKR prototipi", style = MaterialTheme.typography.labelLarge, color = PrimaryTurquoise)
-      Text("Güvenlik özellikleri henüz etkin değil.", style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
-      Text("Güvendiğiniz kişiler ve paylaşım tercihleri için sade bir kontrol alanı.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-    }
-    PrototypeStatus()
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      MetricItem("$count", "Güvenilir kişi", "Yerel kayıt", onPeopleClick, Modifier.weight(1f))
-      MetricItem("—", "Konum paylaşımı", "Etkin değil", onSettingsClick, Modifier.weight(1f))
-    }
-    SectionHeader("Hızlı erişim", color = TextMuted)
-    QuickAction("Kişileri yönet", "Kişi ekleme ve eşleştirme prototipte kullanılamıyor.", onPeopleClick)
-    QuickAction("Ayarlar", "Tema ve uygulama tercihlerini inceleyin.", onSettingsClick)
-    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-  }
-}
-
-@Composable private fun BrandHeader() {
-  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(listOf(PrimaryTurquoise, Violet))), contentAlignment = Alignment.Center) {
-      Text("P", color = Navy950, fontWeight = FontWeight.Black)
-    }
-    Spacer(Modifier.width(11.dp)); Text("PEYKR", color = TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-    Spacer(Modifier.weight(1f)); Text("PROTOTİP", color = TextMuted, style = MaterialTheme.typography.labelSmall)
-  }
-}
-
-@Composable private fun PrototypeStatus() {
-  GlassCard(Modifier.fillMaxWidth()) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      StatusGlyph(Modifier.size(44.dp))
-      Spacer(Modifier.width(14.dp))
-      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text("Sistem durumu", color = TextSecondary, style = MaterialTheme.typography.bodySmall); Text("Hazırlanıyor", color = TextPrimary, style = MaterialTheme.typography.titleMedium) }
-      Text("AKTİF DEĞİL", color = TextMuted, style = MaterialTheme.typography.labelSmall)
+    MinimalPage(Modifier.padding(padding)) {
+      BrandHeader()
+      Text("PEYKR prototipi", color = PrimaryTurquoise, style = MaterialTheme.typography.labelLarge)
+      FocusSymbol()
+      Text("Güvenlik özellikleri henüz etkin değil.", color = TextPrimary, style = MaterialTheme.typography.headlineSmall)
+      Text("Bu sürüm yalnızca temel arayüzü gösterir.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+      Spacer(Modifier.height(12.dp))
+      Text("Sistem durumu", color = TextMuted, style = MaterialTheme.typography.labelLarge)
+      Text("Hazırlanıyor · Aktif değil", color = TextPrimary, style = MaterialTheme.typography.titleMedium)
+      Spacer(Modifier.height(10.dp))
+      HorizontalDivider(color = DividerDark)
+      MinimalSummary("Güvenilir kişiler", "$count kişi", onPeopleClick)
+      MinimalSummary("Konum paylaşımı", "Kapalı", onSettingsClick)
+      Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
     }
   }
 }
 
-@Composable private fun StatusGlyph(modifier: Modifier = Modifier) {
-  Canvas(modifier.semantics { contentDescription = "Etkin olmayan prototip durumu" }) { drawCircle(Color(0x2234D9FF)); drawArc(Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent)), 210f, 235f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)); drawCircle(PrimaryTurquoise, 3.dp.toPx()) }
-}
+@Composable private fun MinimalPage(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AppHorizontalPadding).padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content) }
 
-@Composable private fun MetricItem(value: String, title: String, detail: String, onClick: () -> Unit, modifier: Modifier) {
-  GlassCard(modifier, onClick) { Column(verticalArrangement = Arrangement.spacedBy(7.dp)) { Text(value, color = TextPrimary, style = MaterialTheme.typography.headlineSmall); Text(title, color = TextSecondary, style = MaterialTheme.typography.bodySmall); Text(detail, color = PrimaryTurquoise, style = MaterialTheme.typography.labelSmall) } }
-}
+@Composable private fun BrandHeader() { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("PEYKR", color = TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Text("PROTOTİP", color = TextMuted, style = MaterialTheme.typography.labelSmall) } }
 
-@Composable private fun QuickAction(title: String, detail: String, onClick: () -> Unit) {
-  GlassCard(Modifier.fillMaxWidth(), onClick) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconContainer("•", title, Cyan); Spacer(Modifier.width(13.dp)); Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, color = TextPrimary, style = MaterialTheme.typography.titleMedium); Text(detail, color = TextSecondary, style = MaterialTheme.typography.bodySmall) }; Text("ÖNİZLEME", color = TextMuted, style = MaterialTheme.typography.labelSmall) } }
-}
+@Composable private fun FocusSymbol() { Canvas(Modifier.fillMaxWidth().height(76.dp).semantics { contentDescription = "PEYKR focus sembolü" }) { val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f); drawCircle(PrimaryTurquoise, 22.dp.toPx(), center, style = Stroke(1.5.dp.toPx())); drawCircle(PrimaryTurquoise, 4.dp.toPx(), center); drawLine(PrimaryTurquoise, center.copy(x = center.x - 34.dp.toPx()), center.copy(x = center.x - 23.dp.toPx()), 1.dp.toPx(), cap = StrokeCap.Round); drawLine(PrimaryTurquoise, center.copy(x = center.x + 23.dp.toPx()), center.copy(x = center.x + 34.dp.toPx()), 1.dp.toPx(), cap = StrokeCap.Round) } }
+
+@Composable private fun MinimalSummary(title: String, value: String, onClick: () -> Unit) { Row(Modifier.fillMaxWidth().clickable(onClick = onClick).semantics { contentDescription = title }.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, color = TextPrimary, style = MaterialTheme.typography.titleMedium); Text(value, color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }; Text("Görüntüle", color = PrimaryTurquoise, style = MaterialTheme.typography.labelMedium) } }
 
 @Composable
 fun TrustedPeopleScreen(onNavigate: (NavKey) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier, viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(DefaultDataRepository()) }) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle(); val people = (uiState as? MainScreenUiState.Success)?.data.orEmpty()
   Scaffold(modifier, containerColor = Navy950, contentWindowInsets = WindowInsets.safeDrawing, bottomBar = { PEYKRBottomNavigation(TrustedPeople, onNavigate) }) { padding ->
-    AppBackground(Modifier.padding(padding)) { Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AppHorizontalPadding).padding(top = 22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-      ScreenHeader("Güvenilir kişiler", "Bağlantılarınız bu prototipte yalnızca yerel olarak görüntülenir.", onBack)
+    MinimalPage(Modifier.padding(padding)) {
+      BackAction(onBack); SectionHeader("Güvenilir kişiler", "Güvendiğiniz kişileri bu prototipte yalnızca yerel olarak görüntüleyin.")
       if (people.isEmpty()) {
-        EmptyPeopleVisual()
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Henüz güvenilir kişi yok", color = TextPrimary, style = MaterialTheme.typography.titleLarge); Text("Eşleştirme ve davet akışı henüz kullanılabilir değil.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }
-        GlassCard(Modifier.fillMaxWidth()) { Row(verticalAlignment = Alignment.CenterVertically) { IconContainer("i", "Prototip bilgisi", Violet); Spacer(Modifier.width(12.dp)); Text("Gerçek kişi veya iletişim bilgisi bu prototipte eklenmiyor.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium) } }
-      } else people.forEach { person -> GlassCard(Modifier.fillMaxWidth()) { Text(person, color = TextPrimary, style = MaterialTheme.typography.titleMedium) } }
+        Spacer(Modifier.height(54.dp)); EmptyPeopleMark(); Text("Henüz güvenilir kişi yok", color = TextPrimary, style = MaterialTheme.typography.titleLarge); Text("Eşleştirme ve davet akışı henüz kullanılabilir değil.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium); Spacer(Modifier.height(20.dp)); HorizontalDivider(color = DividerDark); Text("Gerçek kişi veya iletişim bilgisi eklenmiyor.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+      } else people.forEach { person -> Text(person, color = TextPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 14.dp)) }
       Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-    } }
+    }
   }
 }
 
-@Composable private fun EmptyPeopleVisual() { Box(Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(22.dp)).background(DarkPanel), contentAlignment = Alignment.Center) { Canvas(Modifier.size(130.dp)) { drawCircle(Color(0x1834D9FF)); drawCircle(PrimaryTurquoise, 25.dp.toPx(), style = Stroke(1.5.dp.toPx())); drawCircle(Cyan, 5.dp.toPx()); drawCircle(Violet, 5.dp.toPx(), center = androidx.compose.ui.geometry.Offset(size.width * .72f, size.height * .3f)); drawLine(DividerDark, androidx.compose.ui.geometry.Offset(size.width * .25f, size.height * .68f), androidx.compose.ui.geometry.Offset(size.width * .75f, size.height * .32f), 1.dp.toPx()) } } }
+@Composable private fun EmptyPeopleMark() { Canvas(Modifier.size(48.dp).semantics { contentDescription = "Boş güvenilir kişiler durumu" }) { drawCircle(PrimaryTurquoise, 18.dp.toPx(), style = Stroke(1.5.dp.toPx())); drawCircle(PrimaryTurquoise, 3.dp.toPx()); drawLine(PrimaryTurquoise, androidx.compose.ui.geometry.Offset(size.width * .2f, size.height * .8f), androidx.compose.ui.geometry.Offset(size.width * .8f, size.height * .2f), 1.dp.toPx(), cap = StrokeCap.Round) } }
 
 @Composable fun SettingsScreen(onNavigate: (NavKey) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
   Scaffold(modifier, containerColor = Navy950, contentWindowInsets = WindowInsets.safeDrawing, bottomBar = { PEYKRBottomNavigation(Settings, onNavigate) }) { padding ->
-    AppBackground(Modifier.padding(padding)) { Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AppHorizontalPadding).padding(top = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-      ScreenHeader("Ayarlar", "PEYKR tercihleri ve gizlilik yaklaşımı.", onBack)
-      SettingsGroup("Görünüm") { SettingsRow("◐", "Tema", "Koyu tema · Tasarım önceliği", Cyan) }
-      SettingsGroup("Dil") { SettingsRow("文", "Uygulama dili", "Türkçe · Değiştirme henüz kullanılamıyor", Violet) }
-      SettingsGroup("Gizlilik") { SettingsRow("⌖", "Konum paylaşımı", "Kapalı · Özellik henüz etkin değil", PrimaryTurquoise); SettingsRow("◌", "Veri ve yedekleme", "Bulut yedekleme ve hesap kurtarma yok", Purple) }
-      SettingsGroup("Güvenlik") { SettingsRow("◇", "Cihaz doğrulama", "İşletim sistemi doğrulaması planlandı", Violet) }
-      SettingsGroup("Hakkında") { SettingsRow("i", "Prototip sürüm", "PEYKR V.1 · Geliştirme aşamasında", Cyan) }
+    MinimalPage(Modifier.padding(padding)) {
+      SectionHeader("Ayarlar", "PEYKR tercihleri ve gizlilik yaklaşımı.")
+      SettingsGroup("Görünüm") { MinimalSetting("Tema", "Koyu tema · Tasarım önceliği", Cyan) }
+      SettingsGroup("Dil") { MinimalSetting("Uygulama dili", "Türkçe · Değiştirme henüz kullanılamıyor", Cyan) }
+      SettingsGroup("Gizlilik") { MinimalSetting("Konum paylaşımı", "Kapalı · Özellik henüz etkin değil", PrimaryTurquoise); MinimalSetting("Veri ve yedekleme", "Bulut yedekleme ve hesap kurtarma yok", Cyan) }
+      SettingsGroup("Güvenlik") { MinimalSetting("Cihaz doğrulama", "İşletim sistemi doğrulaması planlandı", Cyan) }
+      SettingsGroup("Hakkında") { MinimalSetting("Prototip sürüm", "PEYKR V.1 · Geliştirme aşamasında", Cyan) }
       Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-    } }
+    }
   }
 }
 
-@Composable private fun SettingsGroup(title: String, content: @Composable () -> Unit) { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(title, color = TextMuted, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp)); content() } }
-@Composable private fun ScreenHeader(title: String, supportingText: String, onBack: () -> Unit) { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { androidx.compose.material3.TextButton(onClick = onBack) { Text("Geri", color = PrimaryTurquoise) }; SectionHeader(title, supportingText) } }
-@Composable private fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) { Box(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Navy950, Color(0xFF091322), Navy950)))) { Box(Modifier.align(Alignment.TopEnd).size(180.dp).background(Brush.radialGradient(listOf(Color(0x143C6E9E), Color.Transparent)))); content() } }
+@Composable private fun SettingsGroup(title: String, content: @Composable () -> Unit) { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { Text(title, color = TextMuted, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)); content() } }
+@Composable private fun MinimalSetting(title: String, detail: String, tint: Color) { Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(7.dp).clip(CircleShape).background(tint)); Spacer(Modifier.size(14.dp)); Column(verticalArrangement = Arrangement.spacedBy(3.dp)) { Text(title, color = TextPrimary, style = MaterialTheme.typography.titleMedium); Text(detail, color = TextSecondary, style = MaterialTheme.typography.bodySmall) } } }
+@Composable private fun BackAction(onBack: () -> Unit) { TextButton(onClick = onBack) { Text("Geri", color = PrimaryTurquoise) } }
 
-@Composable private fun PEYKRBottomNavigation(current: NavKey, onNavigate: (NavKey) -> Unit) { Row(Modifier.fillMaxWidth().background(Color(0xF20A1222)).padding(horizontal = 18.dp, vertical = 10.dp).windowInsetsBottomHeight(WindowInsets.navigationBars), horizontalArrangement = Arrangement.SpaceEvenly) { NavigationItem("⌂", "Ana sayfa", current == Main) { onNavigate(Main) }; NavigationItem("•", "Kişiler", current == TrustedPeople) { onNavigate(TrustedPeople) }; NavigationItem("⚙", "Ayarlar", current == Settings) { onNavigate(Settings) } } }
-@Composable private fun NavigationItem(symbol: String, label: String, selected: Boolean, onClick: () -> Unit) { Column(Modifier.clip(RoundedCornerShape(14.dp)).background(if (selected) Color(0x1434D9FF) else Color.Transparent).semantics { contentDescription = label }.padding(horizontal = 18.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { androidx.compose.material3.TextButton(onClick = onClick) { Text(symbol, color = if (selected) PrimaryTurquoise else TextMuted, style = MaterialTheme.typography.titleMedium) }; Text(label, color = if (selected) TextPrimary else TextMuted, style = MaterialTheme.typography.labelSmall) } }
+@Composable private fun PEYKRBottomNavigation(current: NavKey, onNavigate: (NavKey) -> Unit) { Row(Modifier.fillMaxWidth().background(Color(0xF20A1222)).padding(horizontal = 16.dp, vertical = 8.dp).windowInsetsBottomHeight(WindowInsets.navigationBars), horizontalArrangement = Arrangement.SpaceEvenly) { NavigationItem("Ana sayfa", current == Main) { onNavigate(Main) }; NavigationItem("Kişiler", current == TrustedPeople) { onNavigate(TrustedPeople) }; NavigationItem("Ayarlar", current == Settings) { onNavigate(Settings) } } }
+@Composable private fun NavigationItem(label: String, selected: Boolean, onClick: () -> Unit) { TextButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = label }) { Text(label, color = if (selected) PrimaryTurquoise else TextMuted, style = MaterialTheme.typography.labelMedium) } }
