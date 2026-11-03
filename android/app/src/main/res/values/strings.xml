@@ -38,4 +38,9 @@
     <string name="navigation_home">Ana sayfa</string>
     <string name="navigation_people">Kişiler</string>
     <string name="navigation_settings">Ayarlar</string>
+    <string name="pairing_not_paired">Yerel kayıt · Henüz eşleştirilmedi</string>
+    <string name="pairing_paired">Eşleştirildi</string>
+    <string name="pairing_revoked">Eşleştirme iptal edildi</string>
+    <string name="identity_setting">Cihaz kimliği</string>
+    <string name="identity_detail">Yalnızca bu kurulumda kullanılır. Uygulama silinirse yeniden eşleştirme gerekir.</string>
 </resources>

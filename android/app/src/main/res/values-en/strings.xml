@@ -39,4 +39,9 @@
     <string name="navigation_home">Home</string>
     <string name="navigation_people">People</string>
     <string name="navigation_settings">Settings</string>
+    <string name="pairing_not_paired">Local record · Not paired</string>
+    <string name="pairing_paired">Paired</string>
+    <string name="pairing_revoked">Pairing revoked</string>
+    <string name="identity_setting">Device identity</string>
+    <string name="identity_detail">Installation-only identity. Re-pairing is required after uninstall.</string>
 </resources>

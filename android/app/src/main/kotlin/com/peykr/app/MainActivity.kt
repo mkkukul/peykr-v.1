@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.peykr.app.data.LanguagePreferenceStore
+import com.peykr.app.core.identity.AndroidKeyStoreDeviceIdentity
 import com.peykr.app.localization.AppLanguage
 import com.peykr.app.ui.theme.PEYKRTheme
 import java.util.Locale
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
 
     enableEdgeToEdge()
+    runCatching { AndroidKeyStoreDeviceIdentity().getOrCreate() }
     val languageStore = LanguagePreferenceStore(this)
     setContent {
       var language by remember { mutableStateOf(languageStore.load()) }

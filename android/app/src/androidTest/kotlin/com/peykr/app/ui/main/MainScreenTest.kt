@@ -3,6 +3,10 @@ package com.peykr.app.ui.main
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import com.peykr.app.domain.contacts.TrustedContact
+import com.peykr.app.domain.contacts.TrustedContactRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -14,13 +18,21 @@ class MainScreenTest {
 
   @Before
   fun setup() {
-    composeTestRule.setContent { MainScreen(FAKE_DATA) }
+    composeTestRule.setContent {
+      MainScreen({}, {}, {}, FakeContactRepository())
+    }
   }
 
   @Test
-  fun firstItem_exists() {
-    FAKE_DATA.forEach { composeTestRule.onNodeWithText("Hello $it!").assertExists() }
+  fun homeScreen_exists() {
+    composeTestRule.onNodeWithText("PEYKR").assertExists()
   }
 }
 
-private val FAKE_DATA = listOf("Sample1", "Sample2", "Sample3")
+private class FakeContactRepository : TrustedContactRepository {
+  override val contacts: Flow<List<TrustedContact>> = flowOf(emptyList())
+  override suspend fun getById(id: String): TrustedContact? = null
+  override suspend fun add(contact: TrustedContact) = Unit
+  override suspend fun update(contact: TrustedContact) = Unit
+  override suspend fun delete(id: String) = Unit
+}

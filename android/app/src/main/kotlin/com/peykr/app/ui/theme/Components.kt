@@ -37,19 +37,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 val AppHorizontalPadding = 24.dp
-val GlassShape = RoundedCornerShape(18.dp)
+val GlassShape = RoundedCornerShape(14.dp)
 
 enum class PremiumIconKind { Shield, People, Location, Settings, Home, Info, Theme, Language, Backup, Device, Arrow }
 
 @Composable
 fun PremiumSurface(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
   val action = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick).semantics { role = Role.Button }
-  Column(modifier.then(action).clip(GlassShape).background(DarkPanel).border(1.dp, DividerDark, GlassShape).padding(16.dp), content = content)
+  Column(modifier.then(action).clip(GlassShape).background(DarkPanel).border(1.dp, DividerDark, GlassShape).padding(horizontal = 14.dp, vertical = 12.dp), content = content)
 }
 
 @Composable
 fun PremiumIcon(kind: PremiumIconKind, description: String, tint: Color = PrimaryTurquoise, modifier: Modifier = Modifier) {
-  Canvas(modifier.size(36.dp).semantics { contentDescription = description }) {
+  Canvas(modifier.size(32.dp).semantics { contentDescription = description }) {
     val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
     val stroke = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
     when (kind) {
