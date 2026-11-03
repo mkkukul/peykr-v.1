@@ -11,7 +11,7 @@ object PairingStateValidator {
 
   private val allowedInitiatorTransitions: Map<PairingSessionState, Set<PairingSessionState>> = mapOf(
     PairingSessionState.CREATED to setOf(PairingSessionState.QR_READY) + abortTransitions,
-    PairingSessionState.QR_READY to setOf(PairingSessionState.REQUEST_RECEIVED) + abortTransitions,
+    PairingSessionState.QR_READY to setOf(PairingSessionState.QR_READY, PairingSessionState.REQUEST_RECEIVED) + abortTransitions,
     PairingSessionState.REQUEST_RECEIVED to setOf(PairingSessionState.VERIFIED) + abortTransitions,
     PairingSessionState.VERIFIED to setOf(PairingSessionState.WAITING_FOR_LOCAL_APPROVAL) + abortTransitions,
     PairingSessionState.WAITING_FOR_LOCAL_APPROVAL to setOf(PairingSessionState.LOCAL_APPROVED) + abortTransitions,

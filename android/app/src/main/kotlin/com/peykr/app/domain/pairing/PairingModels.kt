@@ -71,8 +71,18 @@ data class RemoteDeviceIdentity(
   }
 
   companion object {
-    fun normalizeDisplayName(raw: String): String =
-      Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
+    const val MAX_DISPLAY_NAME_LENGTH = 64
+
+    fun normalizeDisplayName(raw: String): String {
+      val nfc = Normalizer.normalize(raw.trim(), Normalizer.Form.NFC)
+      val sanitized = nfc.filter { ch ->
+        !ch.isISOControl() &&
+          ch !in '\u200B'..'\u200F' &&
+          ch !in '\u202A'..'\u202E' &&
+          ch !in '\u2066'..'\u2069'
+      }
+      return sanitized.take(MAX_DISPLAY_NAME_LENGTH).trim()
+    }
   }
 }
 
@@ -134,6 +144,84 @@ data class PairingConfirmationTranscript(
   }
 }
 
+internal object JsonUtils {
+  fun escape(s: String): String = buildString {
+    for (ch in s) {
+      when (ch) {
+        '\\' -> append("\\\\")
+        '\"' -> append("\\\"")
+        '\b' -> append("\\b")
+        '\u000c' -> append("\\f")
+        '\n' -> append("\\n")
+        '\r' -> append("\\r")
+        '\t' -> append("\\t")
+        else -> {
+          if (ch < ' ') {
+            append(String.format("\\u%04x", ch.code))
+          } else {
+            append(ch)
+          }
+        }
+      }
+    }
+  }
+
+  fun extractString(json: String, key: String): String? {
+    val pattern = "\"$key\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"".toRegex()
+    val match = pattern.find(json) ?: return null
+    return match.groupValues[1]
+      .replace("\\\"", "\"")
+      .replace("\\\\", "\\")
+      .replace("\\n", "\n")
+      .replace("\\r", "\r")
+      .replace("\\t", "\t")
+      .replace("\\b", "\b")
+      .replace("\\f", "\u000c")
+  }
+
+  fun extractInt(json: String, key: String): Int? {
+    val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
+    return pattern.find(json)?.groupValues?.get(1)?.toIntOrNull()
+  }
+
+  fun extractLong(json: String, key: String): Long? {
+    val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
+    return pattern.find(json)?.groupValues?.get(1)?.toLongOrNull()
+  }
+}
+
+enum class QrMessageType {
+  INITIAL_PAYLOAD,
+  PAIRING_REQUEST,
+  PAIRING_RESPONSE,
+  PAIRING_CONFIRMATION,
+  UNKNOWN,
+}
+
+object QrMessageClassifier {
+  fun classify(payload: String): QrMessageType {
+    val trimmed = payload.trim()
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return QrMessageType.UNKNOWN
+
+    val type = JsonUtils.extractString(trimmed, "t")
+    if (type != null) {
+      return when (type) {
+        "init" -> QrMessageType.INITIAL_PAYLOAD
+        "req" -> QrMessageType.PAIRING_REQUEST
+        "resp" -> QrMessageType.PAIRING_RESPONSE
+        "conf" -> QrMessageType.PAIRING_CONFIRMATION
+        else -> QrMessageType.UNKNOWN
+      }
+    }
+
+    if (trimmed.contains("\"exp\"") && trimmed.contains("\"pk\"") && !trimmed.contains("\"sig\"")) {
+      return QrMessageType.INITIAL_PAYLOAD
+    }
+
+    return QrMessageType.UNKNOWN
+  }
+}
+
 data class PairingQrPayload(
   val version: Int,
   val sessionId: String,
@@ -145,18 +233,18 @@ data class PairingQrPayload(
 ) {
   fun serialize(): String {
     return buildString {
-      append("{\"v\":")
+      append("{\"t\":\"init\",\"v\":")
       append(version)
       append(",\"sid\":\"")
-      append(escape(sessionId))
+      append(JsonUtils.escape(sessionId))
       append("\",\"id\":\"")
-      append(escape(initiatorDeviceId))
+      append(JsonUtils.escape(initiatorDeviceId))
       append("\",\"pk\":\"")
-      append(escape(initiatorPublicKeyBase64))
+      append(JsonUtils.escape(initiatorPublicKeyBase64))
       append("\",\"name\":\"")
-      append(escape(RemoteDeviceIdentity.normalizeDisplayName(initiatorDisplayName)))
+      append(JsonUtils.escape(RemoteDeviceIdentity.normalizeDisplayName(initiatorDisplayName)))
       append("\",\"nonce\":\"")
-      append(escape(initiatorNonceBase64))
+      append(JsonUtils.escape(initiatorNonceBase64))
       append("\",\"exp\":")
       append(expiresAtEpochMillis)
       append("}")
@@ -166,8 +254,8 @@ data class PairingQrPayload(
   companion object {
     const val CURRENT_VERSION = 1
     const val MAX_QR_PAYLOAD_LENGTH = 2048
-    private val UUID_REGEX = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$".toRegex()
-    private val DEVICE_ID_REGEX = "^[0-9a-f]{64}$".toRegex()
+    internal val UUID_REGEX = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$".toRegex()
+    internal val DEVICE_ID_REGEX = "^[0-9a-f]{64}$".toRegex()
 
     fun parse(payload: String): Result<PairingQrPayload> {
       if (payload.length > MAX_QR_PAYLOAD_LENGTH) {
@@ -179,13 +267,13 @@ data class PairingQrPayload(
       }
 
       return runCatching {
-        val version = extractInt(trimmed, "v") ?: throw PairingException.MalformedPayload("Missing or invalid 'v'")
-        val sessionId = extractString(trimmed, "sid") ?: throw PairingException.MalformedPayload("Missing 'sid'")
-        val initiatorDeviceId = extractString(trimmed, "id") ?: throw PairingException.MalformedPayload("Missing 'id'")
-        val initiatorPublicKeyBase64 = extractString(trimmed, "pk") ?: throw PairingException.MalformedPayload("Missing 'pk'")
-        val initiatorDisplayName = extractString(trimmed, "name") ?: throw PairingException.MalformedPayload("Missing 'name'")
-        val initiatorNonceBase64 = extractString(trimmed, "nonce") ?: throw PairingException.MalformedPayload("Missing 'nonce'")
-        val expiresAtEpochMillis = extractLong(trimmed, "exp") ?: throw PairingException.MalformedPayload("Missing or invalid 'exp'")
+        val version = JsonUtils.extractInt(trimmed, "v") ?: throw PairingException.MalformedPayload("Missing or invalid 'v'")
+        val sessionId = JsonUtils.extractString(trimmed, "sid") ?: throw PairingException.MalformedPayload("Missing 'sid'")
+        val initiatorDeviceId = JsonUtils.extractString(trimmed, "id") ?: throw PairingException.MalformedPayload("Missing 'id'")
+        val initiatorPublicKeyBase64 = JsonUtils.extractString(trimmed, "pk") ?: throw PairingException.MalformedPayload("Missing 'pk'")
+        val initiatorDisplayName = JsonUtils.extractString(trimmed, "name") ?: throw PairingException.MalformedPayload("Missing 'name'")
+        val initiatorNonceBase64 = JsonUtils.extractString(trimmed, "nonce") ?: throw PairingException.MalformedPayload("Missing 'nonce'")
+        val expiresAtEpochMillis = JsonUtils.extractLong(trimmed, "exp") ?: throw PairingException.MalformedPayload("Missing or invalid 'exp'")
 
         if (version != CURRENT_VERSION) {
           throw PairingException.ProtocolVersionMismatch("Expected protocol version $CURRENT_VERSION but got $version")
@@ -215,24 +303,6 @@ data class PairingQrPayload(
         )
       }
     }
-
-    private fun escape(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
-
-    private fun extractString(json: String, key: String): String? {
-      val pattern = "\"$key\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"".toRegex()
-      val match = pattern.find(json) ?: return null
-      return match.groupValues[1].replace("\\\"", "\"").replace("\\\\", "\\")
-    }
-
-    private fun extractInt(json: String, key: String): Int? {
-      val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
-      return pattern.find(json)?.groupValues?.get(1)?.toIntOrNull()
-    }
-
-    private fun extractLong(json: String, key: String): Long? {
-      val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
-      return pattern.find(json)?.groupValues?.get(1)?.toLongOrNull()
-    }
   }
 }
 
@@ -244,21 +314,201 @@ data class PairingRequest(
   val responderDisplayName: String,
   val responderNonceBase64: String,
   val responderSignatureBase64: String,
-)
+) {
+  fun serialize(): String {
+    return buildString {
+      append("{\"t\":\"req\",\"v\":")
+      append(protocolVersion)
+      append(",\"sid\":\"")
+      append(JsonUtils.escape(sessionId))
+      append("\",\"id\":\"")
+      append(JsonUtils.escape(responderDeviceId))
+      append("\",\"pk\":\"")
+      append(JsonUtils.escape(responderPublicKeyBase64))
+      append("\",\"name\":\"")
+      append(JsonUtils.escape(RemoteDeviceIdentity.normalizeDisplayName(responderDisplayName)))
+      append("\",\"nonce\":\"")
+      append(JsonUtils.escape(responderNonceBase64))
+      append("\",\"sig\":\"")
+      append(JsonUtils.escape(responderSignatureBase64))
+      append("\"}")
+    }
+  }
+
+  companion object {
+    fun parse(payload: String): Result<PairingRequest> {
+      if (payload.length > PairingQrPayload.MAX_QR_PAYLOAD_LENGTH) {
+        return Result.failure(PairingException.OversizedPayload("Payload exceeds ${PairingQrPayload.MAX_QR_PAYLOAD_LENGTH} characters"))
+      }
+      val trimmed = payload.trim()
+      if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+        return Result.failure(PairingException.MalformedPayload("QR payload must be a JSON object"))
+      }
+
+      return runCatching {
+        val version = JsonUtils.extractInt(trimmed, "v") ?: throw PairingException.MalformedPayload("Missing or invalid 'v'")
+        val sessionId = JsonUtils.extractString(trimmed, "sid") ?: throw PairingException.MalformedPayload("Missing 'sid'")
+        val responderDeviceId = JsonUtils.extractString(trimmed, "id") ?: throw PairingException.MalformedPayload("Missing 'id'")
+        val responderPublicKeyBase64 = JsonUtils.extractString(trimmed, "pk") ?: throw PairingException.MalformedPayload("Missing 'pk'")
+        val responderDisplayName = JsonUtils.extractString(trimmed, "name") ?: throw PairingException.MalformedPayload("Missing 'name'")
+        val responderNonceBase64 = JsonUtils.extractString(trimmed, "nonce") ?: throw PairingException.MalformedPayload("Missing 'nonce'")
+        val responderSignatureBase64 = JsonUtils.extractString(trimmed, "sig") ?: throw PairingException.MalformedPayload("Missing 'sig'")
+
+        if (version != PairingQrPayload.CURRENT_VERSION) {
+          throw PairingException.ProtocolVersionMismatch("Expected protocol version ${PairingQrPayload.CURRENT_VERSION} but got $version")
+        }
+
+        if (!sessionId.matches(PairingQrPayload.UUID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid session ID UUID format: $sessionId")
+        }
+
+        if (!responderDeviceId.matches(PairingQrPayload.DEVICE_ID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid device ID format (must be 64-char hex): $responderDeviceId")
+        }
+
+        val nonceBytes = StrictBase64.decode(responderNonceBase64)
+        if (nonceBytes.size != 16) {
+          throw PairingException.MalformedPayload("Responder nonce must be exactly 16 bytes (got ${nonceBytes.size})")
+        }
+
+        StrictBase64.decode(responderPublicKeyBase64)
+        StrictBase64.decode(responderSignatureBase64)
+
+        PairingRequest(
+          protocolVersion = version,
+          sessionId = sessionId,
+          responderDeviceId = responderDeviceId,
+          responderPublicKeyBase64 = responderPublicKeyBase64,
+          responderDisplayName = RemoteDeviceIdentity.normalizeDisplayName(responderDisplayName),
+          responderNonceBase64 = responderNonceBase64,
+          responderSignatureBase64 = responderSignatureBase64,
+        )
+      }
+    }
+  }
+}
 
 data class PairingResponse(
   val protocolVersion: Int,
   val sessionId: String,
   val initiatorDeviceId: String,
   val initiatorSignatureBase64: String,
-)
+) {
+  fun serialize(): String {
+    return buildString {
+      append("{\"t\":\"resp\",\"v\":")
+      append(protocolVersion)
+      append(",\"sid\":\"")
+      append(JsonUtils.escape(sessionId))
+      append("\",\"id\":\"")
+      append(JsonUtils.escape(initiatorDeviceId))
+      append("\",\"sig\":\"")
+      append(JsonUtils.escape(initiatorSignatureBase64))
+      append("\"}")
+    }
+  }
+
+  companion object {
+    fun parse(payload: String): Result<PairingResponse> {
+      if (payload.length > PairingQrPayload.MAX_QR_PAYLOAD_LENGTH) {
+        return Result.failure(PairingException.OversizedPayload("Payload exceeds ${PairingQrPayload.MAX_QR_PAYLOAD_LENGTH} characters"))
+      }
+      val trimmed = payload.trim()
+      if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+        return Result.failure(PairingException.MalformedPayload("QR payload must be a JSON object"))
+      }
+
+      return runCatching {
+        val version = JsonUtils.extractInt(trimmed, "v") ?: throw PairingException.MalformedPayload("Missing or invalid 'v'")
+        val sessionId = JsonUtils.extractString(trimmed, "sid") ?: throw PairingException.MalformedPayload("Missing 'sid'")
+        val initiatorDeviceId = JsonUtils.extractString(trimmed, "id") ?: throw PairingException.MalformedPayload("Missing 'id'")
+        val initiatorSignatureBase64 = JsonUtils.extractString(trimmed, "sig") ?: throw PairingException.MalformedPayload("Missing 'sig'")
+
+        if (version != PairingQrPayload.CURRENT_VERSION) {
+          throw PairingException.ProtocolVersionMismatch("Expected protocol version ${PairingQrPayload.CURRENT_VERSION} but got $version")
+        }
+
+        if (!sessionId.matches(PairingQrPayload.UUID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid session ID UUID format: $sessionId")
+        }
+
+        if (!initiatorDeviceId.matches(PairingQrPayload.DEVICE_ID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid device ID format (must be 64-char hex): $initiatorDeviceId")
+        }
+
+        StrictBase64.decode(initiatorSignatureBase64)
+
+        PairingResponse(
+          protocolVersion = version,
+          sessionId = sessionId,
+          initiatorDeviceId = initiatorDeviceId,
+          initiatorSignatureBase64 = initiatorSignatureBase64,
+        )
+      }
+    }
+  }
+}
 
 data class PairingConfirmation(
   val protocolVersion: Int,
   val sessionId: String,
   val responderDeviceId: String,
   val confirmationSignatureBase64: String,
-)
+) {
+  fun serialize(): String {
+    return buildString {
+      append("{\"t\":\"conf\",\"v\":")
+      append(protocolVersion)
+      append(",\"sid\":\"")
+      append(JsonUtils.escape(sessionId))
+      append("\",\"id\":\"")
+      append(JsonUtils.escape(responderDeviceId))
+      append("\",\"sig\":\"")
+      append(JsonUtils.escape(confirmationSignatureBase64))
+      append("\"}")
+    }
+  }
+
+  companion object {
+    fun parse(payload: String): Result<PairingConfirmation> {
+      if (payload.length > PairingQrPayload.MAX_QR_PAYLOAD_LENGTH) {
+        return Result.failure(PairingException.OversizedPayload("Payload exceeds ${PairingQrPayload.MAX_QR_PAYLOAD_LENGTH} characters"))
+      }
+      val trimmed = payload.trim()
+      if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+        return Result.failure(PairingException.MalformedPayload("QR payload must be a JSON object"))
+      }
+
+      return runCatching {
+        val version = JsonUtils.extractInt(trimmed, "v") ?: throw PairingException.MalformedPayload("Missing or invalid 'v'")
+        val sessionId = JsonUtils.extractString(trimmed, "sid") ?: throw PairingException.MalformedPayload("Missing 'sid'")
+        val responderDeviceId = JsonUtils.extractString(trimmed, "id") ?: throw PairingException.MalformedPayload("Missing 'id'")
+        val confirmationSignatureBase64 = JsonUtils.extractString(trimmed, "sig") ?: throw PairingException.MalformedPayload("Missing 'sig'")
+
+        if (version != PairingQrPayload.CURRENT_VERSION) {
+          throw PairingException.ProtocolVersionMismatch("Expected protocol version ${PairingQrPayload.CURRENT_VERSION} but got $version")
+        }
+
+        if (!sessionId.matches(PairingQrPayload.UUID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid session ID UUID format: $sessionId")
+        }
+
+        if (!responderDeviceId.matches(PairingQrPayload.DEVICE_ID_REGEX)) {
+          throw PairingException.MalformedPayload("Invalid device ID format (must be 64-char hex): $responderDeviceId")
+        }
+
+        StrictBase64.decode(confirmationSignatureBase64)
+
+        PairingConfirmation(
+          protocolVersion = version,
+          sessionId = sessionId,
+          responderDeviceId = responderDeviceId,
+          confirmationSignatureBase64 = confirmationSignatureBase64,
+        )
+      }
+    }
+  }
+}
 
 data class PairingSession(
   val sessionId: String,

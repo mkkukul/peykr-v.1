@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">PEYKR</string>
+    <string name="app_name">Peykr</string>
     <string name="prototype_label">PROTOTİP</string>
-    <string name="home_kicker">PEYKR prototipi</string>
+    <string name="home_kicker">Peykr prototipi</string>
     <string name="home_headline">Güvenlik özellikleri henüz etkin değil.</string>
     <string name="home_description">Bu sürüm yalnızca temel arayüzü gösterir.</string>
     <string name="system_status">Sistem durumu</string>
@@ -19,7 +19,7 @@
     <string name="trusted_people_empty_description">Eşleştirme ve davet akışı henüz kullanılabilir değil.</string>
     <string name="trusted_people_privacy_note">Gerçek kişi veya iletişim bilgisi eklenmiyor.</string>
     <string name="settings_title">Ayarlar</string>
-    <string name="settings_description">PEYKR tercihleri ve gizlilik yaklaşımı.</string>
+    <string name="settings_description">Peykr tercihleri ve gizlilik yaklaşımı.</string>
     <string name="appearance_section">Görünüm</string>
     <string name="theme_setting">Tema</string>
     <string name="theme_detail">Koyu tema · Tasarım önceliği</string>
@@ -38,7 +38,7 @@
     <string name="biometric_status_update_required">Güvenlik güncellemesi gerekli</string>
     <string name="biometric_status_unsupported">Desteklenmiyor</string>
     <string name="biometric_prompt_title">Güvenlik Doğrulaması</string>
-    <string name="biometric_prompt_description">PEYKR güvenlik ayarlarına erişmek için kimliğinizi doğrulayın.</string>
+    <string name="biometric_prompt_description">Peykr güvenlik ayarlarına erişmek için kimliğinizi doğrulayın.</string>
     <string name="biometric_prompt_cancel">İptal</string>
     <string name="biometric_auth_success">Doğrulandı · Güvenlik geçidi aktif</string>
     <string name="biometric_auth_failed">Doğrulama başarısız</string>
@@ -47,7 +47,7 @@
     <string name="device_verification_detail">İşletim sistemi doğrulaması planlandı</string>
     <string name="about_section">Hakkında</string>
     <string name="prototype_version">Prototip sürüm</string>
-    <string name="prototype_version_detail">PEYKR V.1 · Geliştirme aşamasında</string>
+    <string name="prototype_version_detail">Peykr V.1 · Geliştirme aşamasında</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
     <string name="back_action">Geri</string>
@@ -78,4 +78,47 @@
     <string name="database_error_description">Şifrelenmiş veritabanına erişilemedi. Güvenlik anahtarı kullanılamıyor veya dosya bozulmuş olabilir.</string>
     <string name="database_error_retry">Yeniden dene</string>
     <string name="database_loading">Yükleniyor…</string>
+
+    <!-- Pairing strings -->
+    <string name="pairing_title">Cihaz Eşleştirme</string>
+    <string name="pairing_action_cancel">İptal</string>
+    <string name="pairing_action_done">Tamamlandı</string>
+    <string name="pairing_action_add_device">Güvenilir Cihaz Ekle</string>
+    <string name="pairing_select_mode_title">Eşleştirme Yöntemi</string>
+    <string name="pairing_select_mode_desc">Bu cihazda eşleştirmeyi nasıl başlatmak istiyorsunuz?</string>
+    <string name="pairing_mode_initiator">Karekod Göster (Başlatıcı)</string>
+    <string name="pairing_mode_responder">Karekod Tara (Katılımcı)</string>
+    <string name="pairing_step1_init_title">Adım 1/4: Başlangıç Kodu</string>
+    <string name="pairing_step1_init_desc">Diğer cihazın kamerasını kullanarak bu karekodu taratın.</string>
+    <string name="pairing_action_next_scan_request">İleri: Yanıt Kodunu Tara</string>
+    <string name="pairing_step2_init_title">Adım 2/4: Yanıtı Tara</string>
+    <string name="pairing_step2_init_desc">Diğer cihazın ekranındaki eşleştirme istek kodunu kamerayla tarayın.</string>
+    <string name="pairing_review_title">Cihaz Kimliğini Onayla</string>
+    <string name="pairing_review_desc">Karşı cihaz güvenilir bağlantı talep etti. Parmak izini kontrol edip biyometrik doğrulama ile onaylayın.</string>
+    <string name="pairing_review_device_name">Cihaz Adı</string>
+    <string name="pairing_review_fingerprint">Güvenlik Parmak İzi (SHA-256)</string>
+    <string name="pairing_review_action_approve">Biyometri ile Onayla</string>
+    <string name="pairing_step3_init_title">Adım 3/4: Onay Kodu</string>
+    <string name="pairing_step3_init_desc">Diğer cihaza bu onay karekodunu taratın.</string>
+    <string name="pairing_action_next_scan_confirm">İleri: Son Doğrulamayı Tara</string>
+    <string name="pairing_step4_init_title">Adım 4/4: Son Doğrulama</string>
+    <string name="pairing_step4_init_desc">Diğer cihazın ekranındaki tamamlanma onay kodunu tarayın.</string>
+    <string name="pairing_step1_resp_title">Adım 1/3: Kodu Tara</string>
+    <string name="pairing_step1_resp_desc">Eşleştirmek istediğiniz cihazın ekranındaki başlangıç karekodunu tarayın.</string>
+    <string name="pairing_step2_resp_title">Adım 2/3: İstek Kodu</string>
+    <string name="pairing_step2_resp_desc">İlk cihaza bu istek karekodunu taratın.</string>
+    <string name="pairing_action_next_scan_response">İleri: Onay Kodunu Tara</string>
+    <string name="pairing_step3_resp_title">Adım 3/3: Onay Kodunu Tara</string>
+    <string name="pairing_step3_resp_desc">İlk cihazın ekranındaki onay karekodunu tarayın.</string>
+    <string name="pairing_step4_resp_title">Tamamlandı</string>
+    <string name="pairing_step4_resp_desc">Bu cihazda eşleştirme güvenle tamamlandı. İlk cihazın işlemi bitirmesi için bu son kodu taratın.</string>
+    <string name="pairing_success_title">Cihaz Başarıyla Eşleştirildi</string>
+    <string name="pairing_success_desc">%1$s cihazı karşılıklı kriptografik doğrulama ile güvenilir kişi olarak kaydedildi.</string>
+    <string name="pairing_action_return_contacts">Kişilere Dön</string>
+    <string name="pairing_error_title">Eşleştirme Hatası</string>
+    <string name="pairing_action_retry">Yeniden Başlat</string>
+    <string name="camera_permission_required_title">Kamera İzni Gerekli</string>
+    <string name="camera_permission_required_desc">Karekod tarayarak güvenli cihaz eşleştirmesi yapabilmek için kamera izni gereklidir.</string>
+    <string name="camera_permission_grant">Kamera İzni Ver</string>
+    <string name="camera_permission_settings">Uygulama Ayarları</string>
 </resources>

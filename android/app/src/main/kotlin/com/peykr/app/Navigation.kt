@@ -15,6 +15,7 @@ import com.peykr.app.localization.AppLanguage
 import com.peykr.app.ui.main.MainScreen
 import com.peykr.app.ui.main.SettingsScreen
 import com.peykr.app.ui.main.TrustedPeopleScreen
+import com.peykr.app.ui.pairing.PairingScreen
 
 @Composable
 fun MainNavigation(
@@ -70,6 +71,23 @@ fun MainNavigation(
             onLanguageSelected = onLanguageSelected,
             deviceIdentity = identity,
             securityGate = gate,
+          )
+        }
+        entry<PairingFlow> {
+          val appContainer = context.applicationContext as? AppContainer
+          val engine = appContainer?.pairingEngine
+            ?: remember(identity, gate, repository) {
+              com.peykr.app.domain.pairing.DefaultPairingEngine(
+                deviceIdentity = identity ?: error("DeviceIdentity required"),
+                securityGate = gate ?: error("SecurityGate required"),
+                contactRepository = repository,
+              )
+            }
+          PairingScreen(
+            onBack = { backStack.removeLastOrNull() },
+            pairingEngine = engine,
+            securityGate = gate ?: error("SecurityGate required"),
+            deviceIdentity = identity,
           )
         }
       },

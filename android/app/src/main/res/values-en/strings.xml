@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PEYKR</string>
+    <string name="app_name">Peykr</string>
     <string name="prototype_label">PROTOTYPE</string>
-    <string name="home_kicker">PEYKR prototype</string>
+    <string name="home_kicker">Peykr prototype</string>
     <string name="home_headline">Safety features are not active yet.</string>
     <string name="home_description">This version presents the core interface only.</string>
     <string name="system_status">System status</string>
@@ -20,7 +20,7 @@
     <string name="trusted_people_empty_description">Pairing and invitation flows are not available yet.</string>
     <string name="trusted_people_privacy_note">No real people or contact details are added.</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_description">PEYKR preferences and privacy approach.</string>
+    <string name="settings_description">Peykr preferences and privacy approach.</string>
     <string name="appearance_section">Appearance</string>
     <string name="theme_setting">Theme</string>
     <string name="theme_detail">Dark theme · Design priority</string>
@@ -39,7 +39,7 @@
     <string name="biometric_status_update_required">Security update required</string>
     <string name="biometric_status_unsupported">Unsupported</string>
     <string name="biometric_prompt_title">Security Verification</string>
-    <string name="biometric_prompt_description">Verify your identity to access PEYKR security settings.</string>
+    <string name="biometric_prompt_description">Verify your identity to access Peykr security settings.</string>
     <string name="biometric_prompt_cancel">Cancel</string>
     <string name="biometric_auth_success">Verified · Security gate active</string>
     <string name="biometric_auth_failed">Authentication failed</string>
@@ -48,7 +48,7 @@
     <string name="device_verification_detail">Operating system verification is planned</string>
     <string name="about_section">About</string>
     <string name="prototype_version">Prototype version</string>
-    <string name="prototype_version_detail">PEYKR V.1 · In development</string>
+    <string name="prototype_version_detail">Peykr V.1 · In development</string>
     <string name="language_turkish">Türkçe</string>
     <string name="language_english">English</string>
     <string name="back_action">Back</string>
@@ -79,4 +79,47 @@
     <string name="database_error_description">The encrypted database could not be accessed. The security key may be unavailable or corrupted.</string>
     <string name="database_error_retry">Retry</string>
     <string name="database_loading">Loading…</string>
+
+    <!-- Pairing strings -->
+    <string name="pairing_title">Device Pairing</string>
+    <string name="pairing_action_cancel">Cancel</string>
+    <string name="pairing_action_done">Done</string>
+    <string name="pairing_action_add_device">Add Trusted Device</string>
+    <string name="pairing_select_mode_title">Pairing Mode</string>
+    <string name="pairing_select_mode_desc">How would you like to initiate pairing on this device?</string>
+    <string name="pairing_mode_initiator">Show QR Code (Initiator)</string>
+    <string name="pairing_mode_responder">Scan QR Code (Responder)</string>
+    <string name="pairing_step1_init_title">Step 1/4: Initial Code</string>
+    <string name="pairing_step1_init_desc">Have the other device scan this QR code with its camera.</string>
+    <string name="pairing_action_next_scan_request">Next: Scan Response Code</string>
+    <string name="pairing_step2_init_title">Step 2/4: Scan Request</string>
+    <string name="pairing_step2_init_desc">Scan the pairing request QR code displayed on the other device.</string>
+    <string name="pairing_review_title">Verify Device Identity</string>
+    <string name="pairing_review_desc">The remote device requested trusted pairing. Verify the fingerprint and approve with biometrics.</string>
+    <string name="pairing_review_device_name">Device Name</string>
+    <string name="pairing_review_fingerprint">Security Fingerprint (SHA-256)</string>
+    <string name="pairing_review_action_approve">Approve with Biometrics</string>
+    <string name="pairing_step3_init_title">Step 3/4: Approval Code</string>
+    <string name="pairing_step3_init_desc">Have the other device scan this approval QR code.</string>
+    <string name="pairing_action_next_scan_confirm">Next: Scan Final Confirmation</string>
+    <string name="pairing_step4_init_title">Step 4/4: Final Confirmation</string>
+    <string name="pairing_step4_init_desc">Scan the completion confirmation QR code on the other device.</string>
+    <string name="pairing_step1_resp_title">Step 1/3: Scan Code</string>
+    <string name="pairing_step1_resp_desc">Scan the initial QR code displayed on the device you want to pair with.</string>
+    <string name="pairing_step2_resp_title">Step 2/3: Request Code</string>
+    <string name="pairing_step2_resp_desc">Have the initiator device scan this request QR code.</string>
+    <string name="pairing_action_next_scan_response">Next: Scan Approval Code</string>
+    <string name="pairing_step3_resp_title">Step 3/3: Scan Approval</string>
+    <string name="pairing_step3_resp_desc">Scan the approval QR code displayed on the initiator device.</string>
+    <string name="pairing_step4_resp_title">Completed</string>
+    <string name="pairing_step4_resp_desc">Pairing verified and completed on this device! Have the initiator scan this final code to finalize.</string>
+    <string name="pairing_success_title">Device Successfully Paired</string>
+    <string name="pairing_success_desc">%1$s has been mutually verified and saved as a trusted contact.</string>
+    <string name="pairing_action_return_contacts">Return to Contacts</string>
+    <string name="pairing_error_title">Pairing Error</string>
+    <string name="pairing_action_retry">Restart Pairing</string>
+    <string name="camera_permission_required_title">Camera Permission Required</string>
+    <string name="camera_permission_required_desc">Camera permission is required to scan QR codes for secure device pairing.</string>
+    <string name="camera_permission_grant">Grant Permission</string>
+    <string name="camera_permission_settings">App Settings</string>
 </resources>

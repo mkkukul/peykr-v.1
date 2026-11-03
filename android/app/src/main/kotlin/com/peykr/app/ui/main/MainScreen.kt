@@ -20,10 +20,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.peykr.app.PairingFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -162,8 +165,8 @@ fun MainScreen(
 }
 
 @Composable private fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = AppHorizontalPadding).padding(top = 20.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content) }
-@Composable private fun HomeBrand() { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { PremiumIcon(PremiumIconKind.Shield, "PEYKR"); Spacer(Modifier.width(12.dp)); Column { Text("PEYKR", color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(stringResource(R.string.home_kicker), color = TextSecondary, style = MaterialTheme.typography.bodySmall) }; Spacer(Modifier.weight(1f)); Text(stringResource(R.string.prototype_label), color = PrimaryTurquoise, style = MaterialTheme.typography.labelMedium) } }
-@Composable private fun FocusEmblem() { Box(Modifier.fillMaxWidth().height(124.dp), contentAlignment = Alignment.Center) { Canvas(Modifier.size(112.dp).semantics { contentDescription = "PEYKR güvenlik sembolü" }) { val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f); drawCircle(Color(0x1834D9FF), 48.dp.toPx()); drawCircle(PrimaryTurquoise, 32.dp.toPx(), style = Stroke(2.dp.toPx())); drawArc(Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent)), 210f, 240f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)); drawCircle(PrimaryTurquoise, 3.dp.toPx(), center); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y + 13.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y - 7.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round) } } }
+@Composable private fun HomeBrand() { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { PremiumIcon(PremiumIconKind.Shield, "Peykr"); Spacer(Modifier.width(12.dp)); Column { Text("Peykr", color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold); Text(stringResource(R.string.home_kicker), color = TextSecondary, style = MaterialTheme.typography.bodySmall) }; Spacer(Modifier.weight(1f)); Text(stringResource(R.string.prototype_label), color = PrimaryTurquoise, style = MaterialTheme.typography.labelMedium) } }
+@Composable private fun FocusEmblem() { Box(Modifier.fillMaxWidth().height(124.dp), contentAlignment = Alignment.Center) { Canvas(Modifier.size(112.dp).semantics { contentDescription = "Peykr güvenlik sembolü" }) { val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f); drawCircle(Color(0x1834D9FF), 48.dp.toPx()); drawCircle(PrimaryTurquoise, 32.dp.toPx(), style = Stroke(2.dp.toPx())); drawArc(Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent)), 210f, 240f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round)); drawCircle(PrimaryTurquoise, 3.dp.toPx(), center); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y + 13.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round); drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y - 7.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round) } } }
 
 @Composable
 fun TrustedPeopleScreen(
@@ -250,6 +253,18 @@ fun TrustedPeopleScreen(
           people.forEach { person ->
             PremiumInfoRow(PremiumIconKind.People, person.displayName, pairingLabel(person.pairingStatus), person.displayName)
           }
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+          onClick = { onNavigate(PairingFlow) },
+          modifier = Modifier.fillMaxWidth().height(50.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
+        ) {
+          Text(
+            text = stringResource(R.string.pairing_action_add_device),
+            color = Navy950,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+          )
         }
       }
     }

@@ -8,3 +8,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object TrustedPeople : NavKey
 
 @Serializable data object Settings : NavKey
+
+@Serializable data object PairingFlow : NavKey

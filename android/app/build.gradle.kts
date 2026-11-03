@@ -85,4 +85,11 @@ dependencies {
   implementation(libs.sqlcipher.android)
   implementation(libs.androidx.sqlite)
   implementation(libs.androidx.biometric)
+
+  // CameraX, ML Kit Barcode Scanning & ZXing QR
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
+  implementation(libs.mlkit.barcode.scanning)
+  implementation(libs.zxing.core)
 }

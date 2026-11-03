@@ -25,7 +25,7 @@ class MainScreenTest {
 
   @Test
   fun homeScreen_exists() {
-    composeTestRule.onNodeWithText("PEYKR").assertExists()
+    composeTestRule.onNodeWithText("Peykr").assertExists()
   }
 }
 
