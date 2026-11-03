@@ -29,6 +29,7 @@ internal interface KeyStoreGateway {
   fun getPrivateKey(alias: String): PrivateKey?
   fun deleteEntry(alias: String)
   fun generateKeyPair(alias: String): PublicKey
+  fun getKeySecurityLevel(alias: String): KeySecurityLevel = KeySecurityLevel.UNKNOWN
 }
 
 internal class AndroidKeyStoreGateway : KeyStoreGateway {
@@ -48,6 +49,31 @@ internal class AndroidKeyStoreGateway : KeyStoreGateway {
 
   override fun deleteEntry(alias: String) {
     keyStore.deleteEntry(alias)
+  }
+
+  override fun getKeySecurityLevel(alias: String): KeySecurityLevel {
+    return try {
+      val privateKey = keyStore.getKey(alias, null) as? PrivateKey ?: return KeySecurityLevel.UNKNOWN
+      val factory = KeyFactory.getInstance(privateKey.algorithm, ANDROID_KEY_STORE)
+      val keyInfo = factory.getKeySpec(privateKey, android.security.keystore.KeyInfo::class.java)
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        when (keyInfo.securityLevel) {
+          KeyProperties.SECURITY_LEVEL_STRONGBOX -> KeySecurityLevel.STRONGBOX
+          KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> KeySecurityLevel.TRUSTED_ENVIRONMENT
+          KeyProperties.SECURITY_LEVEL_SOFTWARE -> KeySecurityLevel.SOFTWARE
+          else -> KeySecurityLevel.UNKNOWN
+        }
+      } else {
+        @Suppress("DEPRECATION")
+        if (keyInfo.isInsideSecureHardware) {
+          KeySecurityLevel.TRUSTED_ENVIRONMENT
+        } else {
+          KeySecurityLevel.SOFTWARE
+        }
+      }
+    } catch (_: Throwable) {
+      KeySecurityLevel.UNKNOWN
+    }
   }
 
   override fun generateKeyPair(alias: String): PublicKey {
@@ -197,7 +223,8 @@ class AndroidKeyStoreDeviceIdentity internal constructor(
     val id = MessageDigest.getInstance("SHA-256").digest(encodedPublicKey).joinToString("") {
       "%02x".format(Locale.US, it)
     }
-    return DeviceIdentityInfo(id, publicKey)
+    val secLevel = runCatching { keyStoreGateway.getKeySecurityLevel(ALIAS) }.getOrDefault(KeySecurityLevel.UNKNOWN)
+    return DeviceIdentityInfo(id, publicKey, secLevel)
   }
 
   private fun encodeBase64(bytes: ByteArray): String {

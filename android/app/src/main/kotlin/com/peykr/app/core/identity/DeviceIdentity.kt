@@ -3,7 +3,18 @@ package com.peykr.app.core.identity
 import java.security.PublicKey
 import kotlinx.coroutines.flow.StateFlow
 
-data class DeviceIdentityInfo(val id: String, val publicKey: String)
+enum class KeySecurityLevel {
+  STRONGBOX,
+  TRUSTED_ENVIRONMENT,
+  SOFTWARE,
+  UNKNOWN,
+}
+
+data class DeviceIdentityInfo(
+  val id: String,
+  val publicKey: String,
+  val securityLevel: KeySecurityLevel = KeySecurityLevel.UNKNOWN,
+)
 
 enum class IdentityState {
   INITIALIZING,

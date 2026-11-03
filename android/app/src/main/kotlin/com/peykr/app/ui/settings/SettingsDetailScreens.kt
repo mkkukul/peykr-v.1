@@ -74,6 +74,7 @@ import com.peykr.app.ui.theme.PremiumIconKind
 import com.peykr.app.ui.theme.PremiumSurface
 import com.peykr.app.ui.theme.PrimaryTurquoise
 import com.peykr.app.ui.theme.SectionHeader
+import com.peykr.app.ui.theme.TextMuted
 import com.peykr.app.ui.theme.TextPrimary
 import com.peykr.app.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
@@ -193,7 +194,7 @@ fun DeviceIdentityDetailScreen(
       }
     }
 
-    // Hardware Security Details
+    // Keystore & Hardware Security Details
     PremiumSurface(Modifier.fillMaxWidth()) {
       Row(verticalAlignment = Alignment.Top) {
         PremiumIcon(PremiumIconKind.Shield, stringResource(R.string.detail_identity_keystore_title))
@@ -204,6 +205,22 @@ fun DeviceIdentityDetailScreen(
             color = TextPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
+          )
+          Spacer(Modifier.height(6.dp))
+
+          // Verified Key Security Level
+          val secLevelText = when ((idState as? DeviceIdentityState.Ready)?.identity?.securityLevel) {
+            com.peykr.app.core.identity.KeySecurityLevel.STRONGBOX -> stringResource(R.string.detail_identity_level_strongbox)
+            com.peykr.app.core.identity.KeySecurityLevel.TRUSTED_ENVIRONMENT -> stringResource(R.string.detail_identity_level_tee)
+            com.peykr.app.core.identity.KeySecurityLevel.SOFTWARE -> stringResource(R.string.detail_identity_level_software)
+            else -> stringResource(R.string.detail_identity_level_unknown)
+          }
+
+          Text(
+            text = "${stringResource(R.string.detail_identity_level_title)}: $secLevelText",
+            color = PrimaryTurquoise,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium
           )
           Spacer(Modifier.height(6.dp))
           Text(
@@ -473,6 +490,17 @@ fun LocationSharingDetailScreen(
           )
         )
       }
+      Spacer(Modifier.height(8.dp))
+      Text(
+        text = if (isSharingEnabled && hasPermission) {
+          stringResource(R.string.detail_location_notice_active)
+        } else {
+          stringResource(R.string.detail_location_notice_inactive)
+        },
+        color = TextMuted,
+        style = MaterialTheme.typography.labelSmall,
+        lineHeight = 16.sp
+      )
     }
   }
 }

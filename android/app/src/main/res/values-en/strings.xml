@@ -60,7 +60,7 @@
     <string name="pairing_paired">Paired</string>
     <string name="pairing_revoked">Pairing revoked</string>
     <string name="identity_setting">Device identity</string>
-    <string name="identity_detail">Hardware-backed Ed25519 public identity.</string>
+    <string name="identity_detail">NIST P-256 (secp256r1) ECDSA public identity.</string>
     <string name="identity_status_ready">Ready</string>
     <string name="identity_status_initializing">Preparing…</string>
     <string name="identity_status_error">Unavailable</string>
@@ -103,8 +103,13 @@
     <string name="detail_identity_id_title">Device Security ID</string>
     <string name="detail_identity_copy_action">Copy ID to Clipboard</string>
     <string name="detail_identity_copied_toast">Device ID copied to clipboard</string>
-    <string name="detail_identity_keystore_title">Hardware Security Module</string>
-    <string name="detail_identity_keystore_desc">Key Pair: AndroidKeyStore (StrongBox/TEE)\nAlgorithm: Ed25519 / EC P-256\nAlias: peykr.device.identity.v1\nYour private key never leaves the device hardware.</string>
+    <string name="detail_identity_keystore_title">Android Keystore Security Module</string>
+    <string name="detail_identity_keystore_desc">Key Pair: AndroidKeyStore\nAlgorithm: ECDSA (secp256r1 / NIST P-256)\nSignature: SHA256withECDSA\nAlias: peykr.device.identity.v1\nYour private key is protected by Android Keystore and non-exportable.</string>
+    <string name="detail_identity_level_title">Hardware Security Level</string>
+    <string name="detail_identity_level_strongbox">StrongBox (Dedicated Hardware Security Module)</string>
+    <string name="detail_identity_level_tee">TEE (Hardware-backed Trusted Execution Environment)</string>
+    <string name="detail_identity_level_software">Software Keystore (No Hardware Isolation)</string>
+    <string name="detail_identity_level_unknown">AndroidKeyStore (Runtime Verified)</string>
 
     <!-- Detail Screens: Biometric -->
     <string name="detail_biometric_title">Biometric Security</string>
@@ -124,8 +129,10 @@
     <string name="detail_location_permission_needed">Permission Required</string>
     <string name="detail_location_permission_action">Grant Location Permission</string>
     <string name="detail_location_toggle_title">Peer-to-Peer Location Sharing</string>
-    <string name="detail_location_toggle_active">Active · Sharing with trusted peers</string>
+    <string name="detail_location_toggle_active">Local Permission Active · P2P Transport Layer Pending</string>
     <string name="detail_location_toggle_inactive">Disabled · Location not shared</string>
+    <string name="detail_location_notice_active">Location preference is stored locally on this device. Peer-to-peer transport socket will be connected in a future phase.</string>
+    <string name="detail_location_notice_inactive">Location sharing is disabled. No location data is processed.</string>
 
     <!-- Detail Screens: Data Backup -->
     <string name="detail_backup_title">Data &amp; Storage Security</string>
@@ -143,7 +150,7 @@
     <string name="detail_about_desc">Privacy-first, accountless, serverless cryptographic communication.</string>
     <string name="detail_about_brand_desc">Peykr is an independent security architecture designed against surveillance and data profiling, requiring no accounts, phone numbers, or servers.</string>
     <string name="detail_about_specs_title">Technical Specifications</string>
-    <string name="detail_about_spec_crypto">Cryptography: Ed25519 Digital Signatures, SHA-256</string>
+    <string name="detail_about_spec_crypto">Cryptography: NIST P-256 ECDSA Digital Signatures, SHA-256</string>
     <string name="detail_about_spec_storage">Storage: SQLCipher 256-bit AES Encrypted Database</string>
     <string name="detail_about_spec_auth">Authentication: AndroidX Biometric + Monotonic SecurityGate</string>
     <string name="detail_about_spec_transport">Pairing: 4-Step Mutually Signed QR Protocol</string>

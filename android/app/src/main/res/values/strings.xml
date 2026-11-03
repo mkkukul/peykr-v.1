@@ -59,7 +59,7 @@
     <string name="pairing_paired">Eşleştirildi</string>
     <string name="pairing_revoked">Eşleştirme iptal edildi</string>
     <string name="identity_setting">Cihaz kimliği</string>
-    <string name="identity_detail">Donanım tabanlı Ed25519 açık kimlik.</string>
+    <string name="identity_detail">NIST P-256 (secp256r1) ECDSA açık kimlik.</string>
     <string name="identity_status_ready">Hazır</string>
     <string name="identity_status_initializing">Hazırlanıyor…</string>
     <string name="identity_status_error">Kullanılamıyor</string>
@@ -102,8 +102,13 @@
     <string name="detail_identity_id_title">Cihaz Güvenlik Kimliği (ID)</string>
     <string name="detail_identity_copy_action">Kimliği Panoya Kopyala</string>
     <string name="detail_identity_copied_toast">Cihaz kimliği panoya kopyalandı</string>
-    <string name="detail_identity_keystore_title">Donanım Güvenlik Modülü</string>
-    <string name="detail_identity_keystore_desc">Anahtar Çifti: AndroidKeyStore (StrongBox/TEE)\nAlgoritma: Ed25519 / EC P-256\nAlias: peykr.device.identity.v1\nÖzel anahtarınız cihaz donanımından asla dışarı çıkarılamaz.</string>
+    <string name="detail_identity_keystore_title">Android Keystore Güvenlik Modülü</string>
+    <string name="detail_identity_keystore_desc">Anahtar Çifti: AndroidKeyStore\nAlgoritma: ECDSA (secp256r1 / NIST P-256)\nİmza: SHA256withECDSA\nAlias: peykr.device.identity.v1\nÖzel anahtarınız Android Keystore içinde korunur ve cihazdan dışa aktarılamaz.</string>
+    <string name="detail_identity_level_title">Donanım Güvenlik Seviyesi</string>
+    <string name="detail_identity_level_strongbox">StrongBox (Ayrık Donanım Güvenlik Çipi)</string>
+    <string name="detail_identity_level_tee">TEE (Donanım Korumalı Güvenilir Yürütme Ortamı)</string>
+    <string name="detail_identity_level_software">Yazılım Tabanlı Keystore (Donanım Koruması Yok)</string>
+    <string name="detail_identity_level_unknown">AndroidKeyStore (Doğrulanıyor)</string>
 
     <!-- Detail Screens: Biometric -->
     <string name="detail_biometric_title">Biyometrik Güvenlik</string>
@@ -123,8 +128,10 @@
     <string name="detail_location_permission_needed">İzin Gerekli</string>
     <string name="detail_location_permission_action">Konum İzni Ver</string>
     <string name="detail_location_toggle_title">Eşler Arası Konum Paylaşımı</string>
-    <string name="detail_location_toggle_active">Aktif · Güvenilen cihazlara iletiliyor</string>
+    <string name="detail_location_toggle_active">Yerel İzin Aktif · P2P Taşıma Katmanı Bekleniyor</string>
     <string name="detail_location_toggle_inactive">Devre Dışı · Konum paylaşılmıyor</string>
+    <string name="detail_location_notice_active">Konum tercihi bu cihazda yerel olarak saklanmaktadır. Eşler arası (P2P) aktarım soketi bir sonraki aşamada bağlanacaktır.</string>
+    <string name="detail_location_notice_inactive">Konum paylaşımı kapalıdır. Hiçbir konum verisi işlenmez.</string>
 
     <!-- Detail Screens: Data Backup -->
     <string name="detail_backup_title">Veri ve Depolama Güvenliği</string>
@@ -142,7 +149,7 @@
     <string name="detail_about_desc">Gizlilik odaklı, hesapsız, sunucusuz ve kriptografik iletişim.</string>
     <string name="detail_about_brand_desc">Peykr, gözetim ve veri madenciliğine karşı geliştirilmiş; hesap, telefon numarası veya sunucu gerektirmeyen bağımsız bir güvenlik mimarisidir.</string>
     <string name="detail_about_specs_title">Teknik Özellikler</string>
-    <string name="detail_about_spec_crypto">Kriptografi: Ed25519 Dijital İmzalar, SHA-256</string>
+    <string name="detail_about_spec_crypto">Kriptografi: NIST P-256 ECDSA Dijital İmzalar, SHA-256</string>
     <string name="detail_about_spec_storage">Depolama: SQLCipher 256-bit AES Şifreli Veritabanı</string>
     <string name="detail_about_spec_auth">Doğrulama: AndroidX Biometric + Monotonik SecurityGate</string>
     <string name="detail_about_spec_transport">Eşleştirme: 4-Aşamalı Karşılıklı İmzalı QR Protokolü</string>
