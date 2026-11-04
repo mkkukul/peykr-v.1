@@ -13,4 +13,12 @@ interface TrustedContactRepository {
   suspend fun add(contact: TrustedContact)
   suspend fun update(contact: TrustedContact)
   suspend fun delete(id: String)
+  suspend fun block(id: String) {
+    val existing = getById(id) ?: return
+    update(existing.copy(pairingStatus = PairingStatus.BLOCKED))
+  }
+  suspend fun revoke(id: String) {
+    val existing = getById(id) ?: return
+    update(existing.copy(pairingStatus = PairingStatus.REVOKED, revokedAtEpochMillis = System.currentTimeMillis()))
+  }
 }

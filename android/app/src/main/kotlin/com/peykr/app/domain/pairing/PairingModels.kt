@@ -115,6 +115,17 @@ data class PairingTranscript(
     return baos.toByteArray()
   }
 
+  fun computeSasCode(): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(toCanonicalBytes())
+    val value = ((digest[0].toInt() and 0x7F) shl 24) or
+      ((digest[1].toInt() and 0xFF) shl 16) or
+      ((digest[2].toInt() and 0xFF) shl 8) or
+      (digest[3].toInt() and 0xFF)
+    val num = value % 1_000_000
+    return String.format(Locale.ROOT, "%03d-%03d", num / 1000, num % 1000)
+  }
+
   companion object {
     internal fun writeField(dos: DataOutputStream, value: String) {
       val bytes = value.toByteArray(Charsets.UTF_8)
@@ -141,6 +152,17 @@ data class PairingConfirmationTranscript(
       dos.flush()
     }
     return baos.toByteArray()
+  }
+
+  fun computeSasCode(): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(toCanonicalBytes())
+    val value = ((digest[0].toInt() and 0x7F) shl 24) or
+      ((digest[1].toInt() and 0xFF) shl 16) or
+      ((digest[2].toInt() and 0xFF) shl 8) or
+      (digest[3].toInt() and 0xFF)
+    val num = value % 1_000_000
+    return String.format(Locale.ROOT, "%03d-%03d", num / 1000, num % 1000)
   }
 }
 

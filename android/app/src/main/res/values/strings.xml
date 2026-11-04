@@ -211,4 +211,22 @@
     <string name="camera_init_failed_title">Kamera Başlatılamadı</string>
     <string name="camera_init_failed_desc">Kamera donanımına erişilemedi veya başka bir uygulama tarafından kullanılıyor.</string>
     <string name="camera_init_retry">Kamerayı Yeniden Başlat</string>
+
+    <!-- PIN & Fallback Authentication -->
+    <string name="pin_dialog_title">Güvenlik PIN Doğrulaması</string>
+    <string name="pin_dialog_desc">%1$s cihazını onaylamak için uygulama PIN kodunuzu girin.</string>
+    <string name="pin_dialog_confirm">Doğrula ve Onayla</string>
+    <string name="pairing_action_enter_pin">PIN ile Onayla</string>
+    <string name="pairing_action_setup_pin">Önce PIN Ayarlayın</string>
+    <string name="pairing_action_use_pin_fallback">veya PIN ile onayla</string>
+    <string name="pin_setup_title">Uygulama PIN Güvenliği</string>
+    <string name="pin_setup_desc">Biyometri olmayan veya ek güvenlik gerektiren durumlar için güvenlik PIN kodu belirleyin.</string>
+    <string name="pin_setup_enter_new">Yeni PIN (4–8 hane)</string>
+    <string name="pin_setup_confirm_new">PIN Tekrarı</string>
+    <string name="pin_setup_save">PIN Kodunu Kaydet</string>
+    <string name="pin_change_title">PIN Değiştir</string>
+    <string name="pin_change_current">Mevcut PIN</string>
+    <string name="pin_change_new">Yeni PIN</string>
+    <string name="pin_status_configured">Yapılandırıldı · Güvenli</string>
+    <string name="pin_status_not_configured">Ayarlanmadı · Kurulum gerekli</string>
 </resources>

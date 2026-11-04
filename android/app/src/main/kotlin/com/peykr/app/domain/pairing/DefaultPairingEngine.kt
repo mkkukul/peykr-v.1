@@ -127,6 +127,9 @@ class DefaultPairingEngine(
     }
 
     val existingContact = contactRepository.getById(remoteIdentity.deviceId)
+    if (existingContact != null && existingContact.pairingStatus == PairingStatus.BLOCKED) {
+      throw PairingException.Unauthorized("Device is blocked: ${remoteIdentity.deviceId}")
+    }
     if (existingContact != null && existingContact.pairingStatus == PairingStatus.PAIRED) {
       throw PairingException.ContactAlreadyPaired(remoteIdentity.deviceId)
     }
@@ -244,6 +247,9 @@ class DefaultPairingEngine(
       }
 
       val existingContact = contactRepository.getById(remoteIdentity.deviceId)
+      if (existingContact != null && existingContact.pairingStatus == PairingStatus.BLOCKED) {
+        throw PairingException.Unauthorized("Device is blocked: ${remoteIdentity.deviceId}")
+      }
       if (existingContact != null && existingContact.pairingStatus == PairingStatus.PAIRED) {
         throw PairingException.ContactAlreadyPaired(remoteIdentity.deviceId)
       }

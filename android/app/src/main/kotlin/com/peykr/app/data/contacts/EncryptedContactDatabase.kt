@@ -188,6 +188,13 @@ class EncryptedContactDatabase(private val context: Context, databaseName: Strin
   private fun ensureSchema(database: SQLiteDatabase) {
     database.execSQL("CREATE TABLE IF NOT EXISTS $TABLE (id TEXT PRIMARY KEY NOT NULL, display_name TEXT NOT NULL, public_identity TEXT, pairing_status TEXT NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER)")
     database.execSQL("CREATE INDEX IF NOT EXISTS idx_trusted_contacts_status ON $TABLE(pairing_status)")
+
+    database.execSQL("CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, is_group INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_message TEXT, unread_count INTEGER NOT NULL DEFAULT 0)")
+    database.execSQL("CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY NOT NULL, conversation_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, text_content TEXT, attachment_uri TEXT, attachment_name TEXT, attachment_type TEXT, attachment_size INTEGER, attachment_hash TEXT, status TEXT NOT NULL, direction TEXT NOT NULL, timestamp INTEGER NOT NULL, is_read INTEGER NOT NULL DEFAULT 1)")
+    database.execSQL("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, timestamp)")
+
+    database.execSQL("CREATE TABLE IF NOT EXISTS conversation_members (conversation_id TEXT NOT NULL, contact_id TEXT NOT NULL, role TEXT NOT NULL, joined_at INTEGER NOT NULL, PRIMARY KEY (conversation_id, contact_id))")
+    database.execSQL("CREATE TABLE IF NOT EXISTS call_logs (id TEXT PRIMARY KEY NOT NULL, contact_id TEXT NOT NULL, call_type TEXT NOT NULL, direction TEXT NOT NULL, status TEXT NOT NULL, started_at INTEGER NOT NULL, duration_seconds INTEGER NOT NULL DEFAULT 0)")
   }
 
   private fun verifyDatabase(database: SQLiteDatabase) {

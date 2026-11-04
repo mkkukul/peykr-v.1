@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.peykr.app.core.auth.AuthPromptConfig
+import com.peykr.app.core.auth.AuthorizationToken
+import com.peykr.app.core.auth.RequiredAuthMethod
 import com.peykr.app.core.auth.SecurityGate
 import com.peykr.app.core.auth.SecurityGateScope
 import com.peykr.app.core.identity.DeviceIdentity
@@ -47,6 +49,8 @@ sealed interface PairingUiState {
     val remoteFingerprint: String,
     val isAuthenticating: Boolean = false,
     val errorMessage: String? = null,
+    val authMethod: RequiredAuthMethod = RequiredAuthMethod.BIOMETRIC_OR_PIN,
+    val showPinDialog: Boolean = false,
   ) : PairingUiState
 
   data class InitiatorShowResponseQr(
@@ -72,6 +76,8 @@ sealed interface PairingUiState {
     val remoteFingerprint: String,
     val isAuthenticating: Boolean = false,
     val errorMessage: String? = null,
+    val authMethod: RequiredAuthMethod = RequiredAuthMethod.BIOMETRIC_OR_PIN,
+    val showPinDialog: Boolean = false,
   ) : PairingUiState
 
   data class ResponderShowRequestQr(
@@ -192,10 +198,12 @@ class PairingViewModel(
         val remote = updatedSession.remoteIdentity
         val fingerprint = remote?.deviceId?.let { formatFingerprint(it) } ?: "Unknown"
 
+        val requiredAuth = securityGate.getRequiredAuthMethod()
         _uiState.value = PairingUiState.InitiatorReviewAndApprove(
           session = updatedSession,
           remoteName = remote?.displayName ?: "Unknown Device",
           remoteFingerprint = fingerprint,
+          authMethod = requiredAuth,
         )
       } finally {
         isProcessingScan.set(false)
@@ -203,45 +211,100 @@ class PairingViewModel(
     }
   }
 
+  fun dismissPinDialog() {
+    val current = _uiState.value
+    if (current is PairingUiState.InitiatorReviewAndApprove) {
+      _uiState.value = current.copy(showPinDialog = false)
+    } else if (current is PairingUiState.ResponderReviewAndApprove) {
+      _uiState.value = current.copy(showPinDialog = false)
+    }
+  }
+
   fun approveInitiatorRequest() {
     val session = activeSession ?: return
     val current = _uiState.value as? PairingUiState.InitiatorReviewAndApprove ?: return
 
-    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
+    when (securityGate.getRequiredAuthMethod()) {
+      RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
+        _uiState.value = current.copy(
+          errorMessage = "PIN setup required: please configure your application PIN in Security Settings before approving devices."
+        )
+      }
+      RequiredAuthMethod.PIN_REQUIRED -> {
+        _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
+      }
+      RequiredAuthMethod.BIOMETRIC_OR_PIN -> {
+        _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
+        scope.launch {
+          val promptConfig = AuthPromptConfig(
+            title = "Approve Device Pairing",
+            description = "Authenticate to confirm pairing with ${current.remoteName}",
+          )
+          val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+          val token = authResult.getOrElse { error ->
+            if (securityGate.isPinConfigured()) {
+              _uiState.value = current.copy(
+                isAuthenticating = false,
+                showPinDialog = true,
+                errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
+              )
+            } else {
+              _uiState.value = current.copy(
+                isAuthenticating = false,
+                errorMessage = "Authentication failed: ${error.message}",
+              )
+            }
+            return@launch
+          }
+          executeInitiatorApproval(session, current, token)
+        }
+      }
+    }
+  }
 
+  fun submitPinForInitiatorApproval(pin: String) {
+    val session = activeSession ?: return
+    val current = _uiState.value as? PairingUiState.InitiatorReviewAndApprove ?: return
+
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
     scope.launch {
-      val promptConfig = AuthPromptConfig(
-        title = "Approve Device Pairing",
-        description = "Authenticate to confirm pairing with ${current.remoteName}",
-      )
-      val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+      val authResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, pin)
       val token = authResult.getOrElse { error ->
         _uiState.value = current.copy(
           isAuthenticating = false,
-          errorMessage = "Biometric authentication failed: ${error.message}",
+          showPinDialog = true,
+          errorMessage = "PIN verification failed: ${error.message}",
         )
         return@launch
       }
-
-      val approvalResult = pairingEngine.approvePairingRequest(session, token)
-      val (sentSession, response) = approvalResult.getOrElse { error ->
-        _uiState.value = current.copy(
-          isAuthenticating = false,
-          errorMessage = "Approval failed: ${error.message}",
-        )
-        return@launch
-      }
-      activeSession = sentSession
-
-      val serializedResponse = response.serialize()
-      val matrixResult = QrCodeGenerator.generateQrMatrix(serializedResponse)
-      val matrix = matrixResult.getOrElse { error ->
-        _uiState.value = PairingUiState.Error("Failed to render approval QR: ${error.message}")
-        return@launch
-      }
-
-      _uiState.value = PairingUiState.InitiatorShowResponseQr(sentSession, response, matrix)
+      _uiState.value = current.copy(showPinDialog = false)
+      executeInitiatorApproval(session, current, token)
     }
+  }
+
+  private suspend fun executeInitiatorApproval(
+    session: PairingSession,
+    current: PairingUiState.InitiatorReviewAndApprove,
+    token: AuthorizationToken,
+  ) {
+    val approvalResult = pairingEngine.approvePairingRequest(session, token)
+    val (sentSession, response) = approvalResult.getOrElse { error ->
+      _uiState.value = current.copy(
+        isAuthenticating = false,
+        errorMessage = "Approval failed: ${error.message}",
+      )
+      return
+    }
+    activeSession = sentSession
+
+    val serializedResponse = response.serialize()
+    val matrixResult = QrCodeGenerator.generateQrMatrix(serializedResponse)
+    val matrix = matrixResult.getOrElse { error ->
+      _uiState.value = PairingUiState.Error("Failed to render approval QR: ${error.message}")
+      return
+    }
+
+    _uiState.value = PairingUiState.InitiatorShowResponseQr(sentSession, response, matrix)
   }
 
   fun proceedToScanFinalConfirmation() {
@@ -341,11 +404,13 @@ class PairingViewModel(
           return@launch
         }
 
+        val requiredAuth = securityGate.getRequiredAuthMethod()
         _uiState.value = PairingUiState.ResponderReviewAndApprove(
           qrPayloadString = scannedString,
           payload = payload,
           remoteName = remoteIdentity.displayName,
           remoteFingerprint = formatFingerprint(remoteIdentity.deviceId),
+          authMethod = requiredAuth,
         )
       } finally {
         isProcessingScan.set(false)
@@ -355,46 +420,92 @@ class PairingViewModel(
 
   fun approveResponderRequest(responderDisplayName: String = defaultDeviceName) {
     val current = _uiState.value as? PairingUiState.ResponderReviewAndApprove ?: return
-    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
 
+    when (securityGate.getRequiredAuthMethod()) {
+      RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
+        _uiState.value = current.copy(
+          errorMessage = "PIN setup required: please configure your application PIN in Security Settings before approving devices."
+        )
+      }
+      RequiredAuthMethod.PIN_REQUIRED -> {
+        _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
+      }
+      RequiredAuthMethod.BIOMETRIC_OR_PIN -> {
+        _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
+        scope.launch {
+          val promptConfig = AuthPromptConfig(
+            title = "Approve Device Pairing",
+            description = "Authenticate to request pairing with ${current.remoteName}",
+          )
+          val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+          val token = authResult.getOrElse { error ->
+            if (securityGate.isPinConfigured()) {
+              _uiState.value = current.copy(
+                isAuthenticating = false,
+                showPinDialog = true,
+                errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
+              )
+            } else {
+              _uiState.value = current.copy(
+                isAuthenticating = false,
+                errorMessage = "Authentication required to pair: ${error.message}",
+              )
+            }
+            return@launch
+          }
+          executeResponderApproval(current, token, responderDisplayName)
+        }
+      }
+    }
+  }
+
+  fun submitPinForResponderApproval(pin: String, responderDisplayName: String = defaultDeviceName) {
+    val current = _uiState.value as? PairingUiState.ResponderReviewAndApprove ?: return
+
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
     scope.launch {
-      val promptConfig = AuthPromptConfig(
-        title = "Approve Device Pairing",
-        description = "Authenticate to request pairing with ${current.remoteName}",
-      )
-      val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+      val authResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, pin)
       val token = authResult.getOrElse { error ->
         _uiState.value = current.copy(
           isAuthenticating = false,
-          errorMessage = "Authentication required to pair: ${error.message}",
+          showPinDialog = true,
+          errorMessage = "PIN verification failed: ${error.message}",
         )
         return@launch
       }
-
-      val requestResult = pairingEngine.processQrAndCreateRequest(
-        qrPayloadString = current.qrPayloadString,
-        responderDisplayName = responderDisplayName,
-        authorizationToken = token,
-      )
-
-      val (session, request) = requestResult.getOrElse { error ->
-        _uiState.value = current.copy(
-          isAuthenticating = false,
-          errorMessage = "Failed to process pairing proposal: ${error.message}",
-        )
-        return@launch
-      }
-      activeSession = session
-
-      val serializedRequest = request.serialize()
-      val matrixResult = QrCodeGenerator.generateQrMatrix(serializedRequest)
-      val matrix = matrixResult.getOrElse { error ->
-        _uiState.value = PairingUiState.Error("Failed to render request QR: ${error.message}")
-        return@launch
-      }
-
-      _uiState.value = PairingUiState.ResponderShowRequestQr(session, request, matrix)
+      _uiState.value = current.copy(showPinDialog = false)
+      executeResponderApproval(current, token, responderDisplayName)
     }
+  }
+
+  private suspend fun executeResponderApproval(
+    current: PairingUiState.ResponderReviewAndApprove,
+    token: AuthorizationToken,
+    responderDisplayName: String,
+  ) {
+    val requestResult = pairingEngine.processQrAndCreateRequest(
+      qrPayloadString = current.qrPayloadString,
+      responderDisplayName = responderDisplayName,
+      authorizationToken = token,
+    )
+
+    val (session, request) = requestResult.getOrElse { error ->
+      _uiState.value = current.copy(
+        isAuthenticating = false,
+        errorMessage = "Failed to process pairing proposal: ${error.message}",
+      )
+      return
+    }
+    activeSession = session
+
+    val serializedRequest = request.serialize()
+    val matrixResult = QrCodeGenerator.generateQrMatrix(serializedRequest)
+    val matrix = matrixResult.getOrElse { error ->
+      _uiState.value = PairingUiState.Error("Failed to render request QR: ${error.message}")
+      return
+    }
+
+    _uiState.value = PairingUiState.ResponderShowRequestQr(session, request, matrix)
   }
 
   fun proceedToScanInitiatorResponse() {

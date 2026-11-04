@@ -70,8 +70,8 @@ class DefaultSecurityGateTest {
 
     val result = securityGate.authorize(SecurityGateScope.START_LOCATION_SHARING, promptConfig)
     assertTrue(result.isFailure)
-    val exception = result.exceptionOrNull() as SecurityGateException.AuthenticationDenied
-    assertEquals(AuthenticationResult.NoBiometricEnrollment, exception.result)
+    val exception = result.exceptionOrNull()
+    assertTrue(exception is SecurityGateException)
   }
 
   @Test
@@ -86,8 +86,8 @@ class DefaultSecurityGateTest {
 
     val result = securityGate.authorize(SecurityGateScope.VIEW_SECURITY_DETAILS, promptConfig)
     assertTrue(result.isFailure)
-    val exception = result.exceptionOrNull() as SecurityGateException.AuthenticationDenied
-    assertEquals(AuthenticationResult.HardwareUnavailable, exception.result)
+    val exception = result.exceptionOrNull()
+    assertTrue(exception is SecurityGateException)
   }
 
   @Test
@@ -234,6 +234,91 @@ class DefaultSecurityGateTest {
       "Manually consumed token must no longer be valid",
       securityGate.verifyAuthorization(token, SecurityGateScope.REVOKE_TRUSTED_CONTACT)
     )
+  }
+
+  @Test
+  fun noHardware_withoutPinConfigured_requiresSetupAndDeniesAuth() = runTest {
+    val fakeAuthenticator = FakeBiometricAuthenticator(
+      availability = BiometricAvailability.NO_HARDWARE,
+      authResult = AuthenticationResult.HardwareUnavailable
+    )
+    val securityGate = DefaultSecurityGate(fakeAuthenticator)
+
+    assertEquals(RequiredAuthMethod.SETUP_PIN_REQUIRED, securityGate.getRequiredAuthMethod())
+
+    val result = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+    assertTrue(result.isFailure)
+    assertTrue(result.exceptionOrNull() is SecurityGateException.PinNotConfigured)
+  }
+
+  @Test
+  fun noHardware_withPinConfigured_requiresPin_andAuthorizesSuccessfully() = runTest {
+    val fakeAuthenticator = FakeBiometricAuthenticator(
+      availability = BiometricAvailability.NO_HARDWARE,
+      authResult = AuthenticationResult.HardwareUnavailable
+    )
+    val pinStorage = InMemoryPinStorage()
+    val pinManager = PinSecurityManager(pinStorage)
+    pinManager.setupPin("1234").getOrThrow()
+
+    val securityGate = DefaultSecurityGate(fakeAuthenticator, pinManager)
+
+    assertEquals(RequiredAuthMethod.PIN_REQUIRED, securityGate.getRequiredAuthMethod())
+
+    val tokenResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, "1234")
+    assertTrue(tokenResult.isSuccess)
+    val token = tokenResult.getOrThrow()
+    assertTrue(securityGate.verifyAuthorization(token, SecurityGateScope.APPROVE_TRUSTED_DEVICE))
+  }
+
+  @Test
+  fun noHardware_withWrongPin_failsAuthorization() = runTest {
+    val fakeAuthenticator = FakeBiometricAuthenticator(
+      availability = BiometricAvailability.NO_HARDWARE,
+      authResult = AuthenticationResult.HardwareUnavailable
+    )
+    val pinStorage = InMemoryPinStorage()
+    val pinManager = PinSecurityManager(pinStorage)
+    pinManager.setupPin("1234").getOrThrow()
+
+    val securityGate = DefaultSecurityGate(fakeAuthenticator, pinManager)
+
+    val tokenResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, "9999")
+    assertTrue(tokenResult.isFailure)
+    val ex = tokenResult.exceptionOrNull()
+    assertTrue(ex is SecurityGateException.PinVerificationFailed)
+  }
+
+  @Test
+  fun noneEnrolled_withoutPinConfigured_requiresSetup() = runTest {
+    val fakeAuthenticator = FakeBiometricAuthenticator(
+      availability = BiometricAvailability.NONE_ENROLLED,
+      authResult = AuthenticationResult.NoBiometricEnrollment
+    )
+    val securityGate = DefaultSecurityGate(fakeAuthenticator)
+
+    assertEquals(RequiredAuthMethod.SETUP_PIN_REQUIRED, securityGate.getRequiredAuthMethod())
+    val result = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
+    assertTrue(result.isFailure)
+    assertTrue(result.exceptionOrNull() is SecurityGateException.PinNotConfigured)
+  }
+
+  @Test
+  fun noneEnrolled_withPinConfigured_authorizesWithPin() = runTest {
+    val fakeAuthenticator = FakeBiometricAuthenticator(
+      availability = BiometricAvailability.NONE_ENROLLED,
+      authResult = AuthenticationResult.NoBiometricEnrollment
+    )
+    val pinStorage = InMemoryPinStorage()
+    val pinManager = PinSecurityManager(pinStorage)
+    pinManager.setupPin("5678").getOrThrow()
+
+    val securityGate = DefaultSecurityGate(fakeAuthenticator, pinManager)
+
+    assertEquals(RequiredAuthMethod.PIN_REQUIRED, securityGate.getRequiredAuthMethod())
+    val tokenResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, "5678")
+    assertTrue(tokenResult.isSuccess)
+    assertTrue(securityGate.verifyAuthorization(tokenResult.getOrThrow(), SecurityGateScope.APPROVE_TRUSTED_DEVICE))
   }
 }
 

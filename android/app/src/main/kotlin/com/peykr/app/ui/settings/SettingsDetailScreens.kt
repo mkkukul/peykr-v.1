@@ -24,12 +24,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -52,6 +55,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -60,6 +65,7 @@ import com.peykr.app.R
 import com.peykr.app.core.auth.AuthPromptConfig
 import com.peykr.app.core.auth.AuthenticationResult
 import com.peykr.app.core.auth.BiometricAvailability
+import com.peykr.app.core.auth.PinSecurityManager
 import com.peykr.app.core.auth.SecurityGate
 import com.peykr.app.core.auth.SecurityGateException
 import com.peykr.app.core.auth.SecurityGateScope
@@ -245,6 +251,7 @@ fun DeviceIdentityDetailScreen(
 @Composable
 fun BiometricSettingsDetailScreen(
   securityGate: SecurityGate?,
+  pinSecurityManager: PinSecurityManager? = null,
   onBack: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -268,6 +275,81 @@ fun BiometricSettingsDetailScreen(
   val cancelledText = stringResource(R.string.biometric_auth_cancelled)
   val failedText = stringResource(R.string.biometric_auth_failed)
 
+  var isPinSet by remember { mutableStateOf(securityGate?.isPinConfigured() ?: false) }
+  var showPinDialog by remember { mutableStateOf(false) }
+  var pinFirst by remember { mutableStateOf("") }
+  var pinSecond by remember { mutableStateOf("") }
+  var pinError by remember { mutableStateOf<String?>(null) }
+
+  if (showPinDialog) {
+    AlertDialog(
+      onDismissRequest = { showPinDialog = false },
+      title = { Text(stringResource(R.string.pin_setup_title), color = TextPrimary) },
+      text = {
+        Column {
+          Text(stringResource(R.string.pin_setup_desc), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+          Spacer(Modifier.height(14.dp))
+          OutlinedTextField(
+            value = pinFirst,
+            onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinFirst = it },
+            label = { Text(stringResource(R.string.pin_setup_enter_new)) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(8.dp))
+          OutlinedTextField(
+            value = pinSecond,
+            onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinSecond = it },
+            label = { Text(stringResource(R.string.pin_setup_confirm_new)) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          if (pinError != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(pinError!!, color = Color(0xFFFF8888), style = MaterialTheme.typography.bodySmall)
+          }
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            if (pinFirst != pinSecond) {
+              pinError = "PINs do not match"
+            } else if (pinFirst.length < 4) {
+              pinError = "PIN must be at least 4 digits"
+            } else {
+              pinSecurityManager?.setupPin(pinFirst)?.fold(
+                onSuccess = {
+                  isPinSet = true
+                  showPinDialog = false
+                  pinFirst = ""
+                  pinSecond = ""
+                  pinError = null
+                },
+                onFailure = {
+                  pinError = it.message ?: "Failed to set PIN"
+                }
+              )
+            }
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
+        ) {
+          Text(stringResource(R.string.pin_setup_save), color = Color.White)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showPinDialog = false }) {
+          Text(stringResource(R.string.biometric_prompt_cancel), color = PrimaryTurquoise)
+        }
+      },
+      containerColor = Color(0xFF0F1E36),
+    )
+  }
+
   DetailPage(
     onBack = onBack,
     title = stringResource(R.string.detail_biometric_title),
@@ -288,6 +370,36 @@ fun BiometricSettingsDetailScreen(
             fontWeight = FontWeight.SemiBold
           )
         }
+      }
+    }
+
+    // Application PIN Configuration Card
+    PremiumSurface(Modifier.fillMaxWidth()) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        PremiumIcon(PremiumIconKind.Shield, stringResource(R.string.pin_setup_title))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+          Text(stringResource(R.string.pin_setup_title), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+          Spacer(Modifier.height(2.dp))
+          Text(
+            if (isPinSet) stringResource(R.string.pin_status_configured) else stringResource(R.string.pin_status_not_configured),
+            color = if (isPinSet) PrimaryTurquoise else Color(0xFFFFB74D),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+          )
+        }
+      }
+      Spacer(Modifier.height(12.dp))
+      OutlinedButton(
+        onClick = {
+          pinFirst = ""
+          pinSecond = ""
+          pinError = null
+          showPinDialog = true
+        },
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        Text(if (isPinSet) stringResource(R.string.pin_change_title) else stringResource(R.string.pin_setup_save), color = PrimaryTurquoise)
       }
     }
 

@@ -11,6 +11,12 @@ enum class BiometricAvailability {
   UNSUPPORTED
 }
 
+enum class RequiredAuthMethod {
+  BIOMETRIC_OR_PIN,
+  PIN_REQUIRED,
+  SETUP_PIN_REQUIRED
+}
+
 sealed interface AuthenticationResult {
   data class Success(val timestampEpochMillis: Long = System.currentTimeMillis()) : AuthenticationResult
   data class Failure(val errorCode: Int? = null, val message: String) : AuthenticationResult
@@ -20,6 +26,7 @@ sealed interface AuthenticationResult {
   data object DeviceCredentialUnavailable : AuthenticationResult
   data object UnsupportedAuthentication : AuthenticationResult
   data class TemporarySystemError(val cause: Throwable? = null) : AuthenticationResult
+  data class PinResult(val verification: PinVerificationResult) : AuthenticationResult
 }
 
 data class AuthPromptConfig(

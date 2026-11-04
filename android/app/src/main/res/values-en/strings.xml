@@ -212,4 +212,22 @@
     <string name="camera_init_failed_title">Camera Initialization Failed</string>
     <string name="camera_init_failed_desc">Camera hardware could not be accessed or is in use by another application.</string>
     <string name="camera_init_retry">Restart Camera</string>
+
+    <!-- PIN & Fallback Authentication -->
+    <string name="pin_dialog_title">Security PIN Verification</string>
+    <string name="pin_dialog_desc">Enter your application PIN to authorize pairing with %1$s.</string>
+    <string name="pin_dialog_confirm">Verify &amp; Approve</string>
+    <string name="pairing_action_enter_pin">Approve with PIN</string>
+    <string name="pairing_action_setup_pin">Setup PIN First</string>
+    <string name="pairing_action_use_pin_fallback">or approve with PIN</string>
+    <string name="pin_setup_title">Application PIN Security</string>
+    <string name="pin_setup_desc">Configure a security PIN for devices without biometrics or for fallback authorization.</string>
+    <string name="pin_setup_enter_new">New PIN (4–8 digits)</string>
+    <string name="pin_setup_confirm_new">Confirm PIN</string>
+    <string name="pin_setup_save">Save PIN Code</string>
+    <string name="pin_change_title">Change PIN</string>
+    <string name="pin_change_current">Current PIN</string>
+    <string name="pin_change_new">New PIN</string>
+    <string name="pin_status_configured">Configured · Secure</string>
+    <string name="pin_status_not_configured">Not configured · Setup required</string>
 </resources>

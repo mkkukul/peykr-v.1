@@ -20,3 +20,13 @@ import kotlinx.serialization.Serializable
 @Serializable data object DataBackupDetail : NavKey
 
 @Serializable data object AboutDetail : NavKey
+
+@Serializable data class ConversationDetail(val conversationId: String, val title: String) : NavKey
+
+@Serializable data object MessagesList : NavKey
+
+@Serializable data object ActiveCall : NavKey
+
+@Serializable data object FileTransfer : NavKey
+
+@Serializable data object PinSetupDetail : NavKey

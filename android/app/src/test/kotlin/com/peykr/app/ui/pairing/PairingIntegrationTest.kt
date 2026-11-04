@@ -353,6 +353,59 @@ class PairingIntegrationTest {
     analyzer.close()
     analyzer.close()
   }
+
+  @Test
+  fun transcript_computesDeterministicSasCode_onBothPeers() {
+    val transcript = com.peykr.app.domain.pairing.PairingTranscript(
+      protocolVersion = 1,
+      sessionId = "sess_123",
+      initiatorDeviceId = "devA",
+      initiatorPublicKeyBase64 = "pkA",
+      initiatorNonceBase64 = "nonceA",
+      responderDeviceId = "devB",
+      responderPublicKeyBase64 = "pkB",
+      responderNonceBase64 = "nonceB",
+      expiresAtEpochMillis = 999999L,
+    )
+
+    val sasCode1 = transcript.computeSasCode()
+    val sasCode2 = transcript.computeSasCode()
+
+    assertEquals(sasCode1, sasCode2)
+    assertTrue("SAS code should match pattern 000-000", sasCode1.matches("^\\d{3}-\\d{3}$".toRegex()))
+  }
+
+  @Test
+  fun blockedContact_isRejectedByPairingEngine() = runTest {
+    val identityA = TestDeviceIdentity("DeviceA")
+    val identityB = TestDeviceIdentity("DeviceB")
+    val repoA = InMemoryContactRepository()
+    val repoB = InMemoryContactRepository()
+
+    // B is blocked on A
+    repoA.contactsMap[identityB.deviceId] = TrustedContact(
+      id = identityB.deviceId,
+      displayName = "Blocked Peer",
+      pairingStatus = PairingStatus.BLOCKED,
+      createdAtEpochMillis = 100L,
+    )
+
+    val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val gateB = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val engineA = DefaultPairingEngine(identityA, gateA, repoA)
+    val engineB = DefaultPairingEngine(identityB, gateB, repoB)
+
+    // B scans A's QR and sends request to A
+    val sessionA = engineA.createInitiatorSession("DeviceA").getOrThrow()
+    val qrPayload = engineA.generateQrPayload(sessionA).getOrThrow()
+
+    val tokenB = gateB.authorize(com.peykr.app.core.auth.SecurityGateScope.APPROVE_TRUSTED_DEVICE, AuthPromptConfig("title")).getOrThrow()
+    val requestResult = engineB.processQrAndCreateRequest(qrPayload.serialize(), "DeviceB", tokenB).getOrThrow()
+
+    // A receives request from blocked device B
+    val receiveResult = engineA.receivePairingRequest(sessionA, requestResult.request)
+    assertTrue("Pairing with blocked device must fail", receiveResult.isFailure)
+  }
 }
 
 private class InMemoryContactRepository : TrustedContactRepository {

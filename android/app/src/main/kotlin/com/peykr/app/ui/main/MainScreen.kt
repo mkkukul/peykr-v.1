@@ -62,8 +62,10 @@ import com.peykr.app.AboutDetail
 import com.peykr.app.BiometricSettingsDetail
 import com.peykr.app.DataBackupDetail
 import com.peykr.app.DeviceIdentityDetail
+import com.peykr.app.FileTransfer
 import com.peykr.app.LocationSharingDetail
 import com.peykr.app.Main
+import com.peykr.app.MessagesList
 import com.peykr.app.PairingFlow
 import com.peykr.app.R
 import com.peykr.app.Settings
@@ -315,6 +317,20 @@ fun MainScreen(
           title = stringResource(R.string.action_security_settings),
           icon = PremiumIconKind.Settings,
           onClick = onSettingsClick
+        )
+      }
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        QuickActionButton(
+          modifier = Modifier.weight(1f),
+          title = "Özel Mesajlar",
+          icon = PremiumIconKind.Device,
+          onClick = { onNavigate(MessagesList) }
+        )
+        QuickActionButton(
+          modifier = Modifier.weight(1f),
+          title = "Dosya Aktarımı",
+          icon = PremiumIconKind.Backup,
+          onClick = { onNavigate(FileTransfer) }
         )
       }
     }
@@ -661,6 +677,7 @@ private fun StatusBadge(status: PairingStatus) {
     PairingStatus.PAIRED -> Triple(stringResource(R.string.pairing_paired), Color(0x2234D9FF), PrimaryTurquoise)
     PairingStatus.PENDING -> Triple(stringResource(R.string.pairing_pending), Color(0x33FFB74D), Color(0xFFFFB74D))
     PairingStatus.REVOKED -> Triple(stringResource(R.string.pairing_revoked), Color(0x33FF5252), Color(0xFFFF5252))
+    PairingStatus.BLOCKED -> Triple("Engellendi", Color(0x339E9E9E), Color(0xFFE0E0E0))
     PairingStatus.NOT_PAIRED -> Triple(stringResource(R.string.pairing_not_paired), Color(0x229E9E9E), TextSecondary)
   }
   Box(

@@ -17,16 +17,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,11 +41,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peykr.app.R
+import com.peykr.app.core.auth.RequiredAuthMethod
 import com.peykr.app.core.auth.SecurityGate
 import com.peykr.app.core.identity.DeviceIdentity
 import com.peykr.app.domain.pairing.PairingEngine
@@ -147,7 +156,11 @@ fun PairingScreen(
             remoteFingerprint = current.remoteFingerprint,
             isAuthenticating = current.isAuthenticating,
             errorMessage = current.errorMessage,
+            authMethod = current.authMethod,
+            showPinDialog = current.showPinDialog,
             onApprove = { actualViewModel.approveInitiatorRequest() },
+            onSubmitPin = { actualViewModel.submitPinForInitiatorApproval(it) },
+            onDismissPin = { actualViewModel.dismissPinDialog() },
           )
         }
 
@@ -185,7 +198,11 @@ fun PairingScreen(
             remoteFingerprint = current.remoteFingerprint,
             isAuthenticating = current.isAuthenticating,
             errorMessage = current.errorMessage,
+            authMethod = current.authMethod,
+            showPinDialog = current.showPinDialog,
             onApprove = { actualViewModel.approveResponderRequest() },
+            onSubmitPin = { actualViewModel.submitPinForResponderApproval(it) },
+            onDismissPin = { actualViewModel.dismissPinDialog() },
           )
         }
 
@@ -393,8 +410,64 @@ private fun ReviewAndApproveContent(
   remoteFingerprint: String,
   isAuthenticating: Boolean,
   errorMessage: String?,
+  authMethod: RequiredAuthMethod = RequiredAuthMethod.BIOMETRIC_OR_PIN,
+  showPinDialog: Boolean = false,
   onApprove: () -> Unit,
+  onSubmitPin: (String) -> Unit = {},
+  onDismissPin: () -> Unit = {},
 ) {
+  var pinInput by remember { mutableStateOf("") }
+
+  if (showPinDialog) {
+    AlertDialog(
+      onDismissRequest = onDismissPin,
+      title = { Text(stringResource(R.string.pin_dialog_title), color = TextPrimary) },
+      text = {
+        Column {
+          Text(
+            stringResource(R.string.pin_dialog_desc, remoteName),
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+          )
+          Spacer(Modifier.height(16.dp))
+          OutlinedTextField(
+            value = pinInput,
+            onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinInput = it },
+            label = { Text("PIN") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            if (pinInput.isNotBlank()) {
+              onSubmitPin(pinInput)
+              pinInput = ""
+            }
+          },
+          enabled = pinInput.length >= 4 && !isAuthenticating,
+          colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
+        ) {
+          if (isAuthenticating) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+          } else {
+            Text(stringResource(R.string.pin_dialog_confirm), color = Color.White)
+          }
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = onDismissPin) {
+          Text(stringResource(R.string.pairing_action_cancel), color = PrimaryTurquoise)
+        }
+      },
+      containerColor = Color(0xFF0F1E36),
+    )
+  }
+
   Column(
     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
@@ -427,6 +500,12 @@ private fun ReviewAndApproveContent(
       Spacer(Modifier.height(12.dp))
     }
 
+    val buttonLabel = when (authMethod) {
+      RequiredAuthMethod.PIN_REQUIRED -> stringResource(R.string.pairing_action_enter_pin)
+      RequiredAuthMethod.SETUP_PIN_REQUIRED -> stringResource(R.string.pairing_action_setup_pin)
+      RequiredAuthMethod.BIOMETRIC_OR_PIN -> stringResource(R.string.pairing_review_action_approve)
+    }
+
     Button(
       onClick = onApprove,
       enabled = !isAuthenticating,
@@ -436,7 +515,14 @@ private fun ReviewAndApproveContent(
       if (isAuthenticating) {
         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
       } else {
-        Text(stringResource(R.string.pairing_review_action_approve), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+        Text(buttonLabel, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+      }
+    }
+
+    if (authMethod == RequiredAuthMethod.BIOMETRIC_OR_PIN) {
+      Spacer(Modifier.height(8.dp))
+      TextButton(onClick = { onApprove() /* will trigger fallback */ }) {
+        Text(stringResource(R.string.pairing_action_use_pin_fallback), color = PrimaryTurquoise)
       }
     }
   }

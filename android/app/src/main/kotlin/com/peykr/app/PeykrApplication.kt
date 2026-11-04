@@ -12,16 +12,32 @@ import com.peykr.app.core.identity.AndroidKeyStoreDeviceIdentity
 import com.peykr.app.core.identity.DeviceIdentity
 import com.peykr.app.data.contacts.SqliteTrustedContactRepository
 import com.peykr.app.domain.contacts.TrustedContactRepository
+import com.peykr.app.core.auth.PinSecurityManager
+import com.peykr.app.core.auth.SharedPreferencesPinStorage
+import com.peykr.app.data.messaging.SqliteMessagingRepository
+import com.peykr.app.domain.calling.CallingEngine
+import com.peykr.app.domain.calling.DefaultCallingEngine
+import com.peykr.app.domain.location.LocationSafetyEngine
+import com.peykr.app.domain.messaging.MessagingEngine
+import com.peykr.app.domain.messaging.MessagingRepository
 import com.peykr.app.domain.pairing.DefaultPairingEngine
 import com.peykr.app.domain.pairing.PairingEngine
+import com.peykr.app.domain.transfer.FileTransferEngine
+import java.io.File
 import java.lang.ref.WeakReference
 
 interface AppContainer {
   val contactRepository: TrustedContactRepository
   val deviceIdentity: DeviceIdentity
   val biometricAuthenticator: BiometricAuthenticator
+  val pinSecurityManager: PinSecurityManager
   val securityGate: SecurityGate
   val pairingEngine: PairingEngine
+  val messagingRepository: MessagingRepository
+  val messagingEngine: MessagingEngine
+  val callingEngine: CallingEngine
+  val fileTransferEngine: FileTransferEngine
+  val locationSafetyEngine: LocationSafetyEngine
 }
 
 class PeykrApplication : Application(), AppContainer {
@@ -39,14 +55,47 @@ class PeykrApplication : Application(), AppContainer {
     AndroidBiometricAuthenticator(this) { activeActivityRef.get() }
   }
 
+  override val pinSecurityManager: PinSecurityManager by lazy {
+    PinSecurityManager(SharedPreferencesPinStorage(this))
+  }
+
   override val securityGate: SecurityGate by lazy {
-    DefaultSecurityGate(biometricAuthenticator)
+    DefaultSecurityGate(biometricAuthenticator, pinSecurityManager)
   }
 
   override val pairingEngine: PairingEngine by lazy {
     DefaultPairingEngine(
       deviceIdentity = deviceIdentity,
       securityGate = securityGate,
+      contactRepository = contactRepository,
+    )
+  }
+
+  override val messagingRepository: MessagingRepository by lazy {
+    SqliteMessagingRepository(this)
+  }
+
+  override val messagingEngine: MessagingEngine by lazy {
+    MessagingEngine(
+      deviceIdentity = deviceIdentity,
+      messagingRepository = messagingRepository,
+    )
+  }
+
+  override val callingEngine: CallingEngine by lazy {
+    DefaultCallingEngine()
+  }
+
+  override val fileTransferEngine: FileTransferEngine by lazy {
+    FileTransferEngine(
+      transferCacheDir = File(cacheDir, "transfers"),
+      completedDownloadsDir = File(getExternalFilesDir(null) ?: filesDir, "PeykrDownloads"),
+    )
+  }
+
+  override val locationSafetyEngine: LocationSafetyEngine by lazy {
+    LocationSafetyEngine(
+      deviceIdentity = deviceIdentity,
       contactRepository = contactRepository,
     )
   }
@@ -84,5 +133,6 @@ class PeykrApplication : Application(), AppContainer {
     super.onTerminate()
     deviceIdentity.close()
     (contactRepository as? SqliteTrustedContactRepository)?.close()
+    (messagingRepository as? SqliteMessagingRepository)?.close()
   }
 }
