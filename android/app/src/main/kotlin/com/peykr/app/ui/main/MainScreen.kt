@@ -1,6 +1,7 @@
 package com.peykr.app.ui.main
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,6 +77,7 @@ import com.peykr.app.core.auth.SecurityGateScope
 import com.peykr.app.core.identity.DeviceIdentity
 import com.peykr.app.core.identity.DeviceIdentityInfo
 import com.peykr.app.core.identity.DeviceIdentityState
+import com.peykr.app.data.AppThemeMode
 import com.peykr.app.data.contacts.DatabaseState
 import com.peykr.app.domain.contacts.PairingStatus
 import com.peykr.app.domain.contacts.TrustedContact
@@ -81,6 +86,7 @@ import com.peykr.app.localization.AppLanguage
 import com.peykr.app.ui.theme.AppHorizontalPadding
 import com.peykr.app.ui.theme.DividerDark
 import com.peykr.app.ui.theme.Navy950
+import com.peykr.app.ui.theme.PeykrTheme
 import com.peykr.app.ui.theme.PremiumIcon
 import com.peykr.app.ui.theme.PremiumIconKind
 import com.peykr.app.ui.theme.PremiumInfoRow
@@ -90,6 +96,8 @@ import com.peykr.app.ui.theme.SectionHeader
 import com.peykr.app.ui.theme.TextMuted
 import com.peykr.app.ui.theme.TextPrimary
 import com.peykr.app.ui.theme.TextSecondary
+import com.peykr.app.ui.theme.peykrEmblem
+import com.peykr.app.ui.theme.peykrLogo
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -375,7 +383,11 @@ private fun Page(modifier: Modifier = Modifier, content: @Composable ColumnScope
 @Composable
 private fun HomeBrand() {
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    PremiumIcon(PremiumIconKind.Shield, "Peykr")
+    Image(
+      painter = peykrEmblem(),
+      contentDescription = "Peykr",
+      modifier = Modifier.size(36.dp)
+    )
     Spacer(Modifier.width(12.dp))
     Column {
       Text("Peykr", color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -385,7 +397,7 @@ private fun HomeBrand() {
     Box(
       Modifier
         .clip(RoundedCornerShape(6.dp))
-        .background(Color(0x2234D9FF))
+        .background(PrimaryTurquoise.copy(alpha = 0.15f))
         .border(1.dp, PrimaryTurquoise.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
         .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
@@ -396,16 +408,12 @@ private fun HomeBrand() {
 
 @Composable
 private fun FocusEmblem() {
-  Box(Modifier.fillMaxWidth().height(110.dp), contentAlignment = Alignment.Center) {
-    Canvas(Modifier.size(100.dp).semantics { contentDescription = "Peykr güvenlik sembolü" }) {
-      val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-      drawCircle(Color(0x1834D9FF), 44.dp.toPx())
-      drawCircle(PrimaryTurquoise, 30.dp.toPx(), style = Stroke(2.dp.toPx()))
-      drawArc(Brush.sweepGradient(listOf(PrimaryTurquoise, Color.Transparent)), 210f, 240f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-      drawCircle(PrimaryTurquoise, 3.dp.toPx(), center)
-      drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y + 12.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round)
-      drawLine(PrimaryTurquoise, center.copy(y = center.y + 3.dp.toPx()), center.copy(y = center.y - 7.dp.toPx()), 2.dp.toPx(), cap = StrokeCap.Round)
-    }
+  Box(Modifier.fillMaxWidth().height(125.dp), contentAlignment = Alignment.Center) {
+    Image(
+      painter = peykrLogo(),
+      contentDescription = stringResource(R.string.home_headline),
+      modifier = Modifier.height(115.dp)
+    )
   }
 }
 
@@ -492,7 +500,7 @@ fun TrustedPeopleScreen(
               colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
               modifier = Modifier.align(Alignment.End)
             ) {
-              Text(stringResource(R.string.database_error_retry), color = Navy950, fontWeight = FontWeight.Bold)
+              Text(stringResource(R.string.database_error_retry), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
           }
         }
@@ -538,7 +546,7 @@ fun TrustedPeopleScreen(
             ) {
               Text(
                 text = stringResource(R.string.action_pair_device),
-                color = Navy950,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
               )
             }
@@ -557,7 +565,7 @@ fun TrustedPeopleScreen(
             ) {
               Text(
                 text = stringResource(R.string.pairing_action_add_device),
-                color = Navy950,
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
               )
             }
@@ -672,15 +680,17 @@ private fun formatFingerprintShort(raw: String): String {
 
 @Composable
 private fun TrustIllustration() {
+  val strokeColor = PeykrTheme.colors.primaryAccent
+  val bgCircle = PeykrTheme.colors.background
   Canvas(Modifier.fillMaxWidth().height(110.dp).semantics { contentDescription = "Güvenilir kişiler sembolü" }) {
     val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-    drawOval(PrimaryTurquoise, androidx.compose.ui.geometry.Offset(center.x - 68.dp.toPx(), center.y - 16.dp.toPx()), androidx.compose.ui.geometry.Size(136.dp.toPx(), 58.dp.toPx()), style = Stroke(1.5.dp.toPx()))
-    drawCircle(PrimaryTurquoise, 13.dp.toPx(), center.copy(x = center.x - 20.dp.toPx(), y = center.y - 18.dp.toPx()))
-    drawCircle(PrimaryTurquoise, 11.dp.toPx(), center.copy(x = center.x + 20.dp.toPx(), y = center.y - 14.dp.toPx()))
-    drawArc(PrimaryTurquoise, 200f, 140f, false, androidx.compose.ui.geometry.Offset(center.x - 42.dp.toPx(), center.y - 3.dp.toPx()), androidx.compose.ui.geometry.Size(44.dp.toPx(), 40.dp.toPx()), style = Stroke(2.dp.toPx()))
-    drawArc(PrimaryTurquoise, 200f, 140f, false, androidx.compose.ui.geometry.Offset(center.x - 2.dp.toPx(), center.y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(40.dp.toPx(), 36.dp.toPx()), style = Stroke(2.dp.toPx()))
-    drawCircle(Navy950, 21.dp.toPx(), center.copy(x = center.x + 56.dp.toPx(), y = center.y + 16.dp.toPx()))
-    drawCircle(PrimaryTurquoise, 18.dp.toPx(), center.copy(x = center.x + 56.dp.toPx(), y = center.y + 16.dp.toPx()), style = Stroke(2.dp.toPx()))
+    drawOval(strokeColor, androidx.compose.ui.geometry.Offset(center.x - 68.dp.toPx(), center.y - 16.dp.toPx()), androidx.compose.ui.geometry.Size(136.dp.toPx(), 58.dp.toPx()), style = Stroke(1.5.dp.toPx()))
+    drawCircle(strokeColor, 13.dp.toPx(), center.copy(x = center.x - 20.dp.toPx(), y = center.y - 18.dp.toPx()))
+    drawCircle(strokeColor, 11.dp.toPx(), center.copy(x = center.x + 20.dp.toPx(), y = center.y - 14.dp.toPx()))
+    drawArc(strokeColor, 200f, 140f, false, androidx.compose.ui.geometry.Offset(center.x - 42.dp.toPx(), center.y - 3.dp.toPx()), androidx.compose.ui.geometry.Size(44.dp.toPx(), 40.dp.toPx()), style = Stroke(2.dp.toPx()))
+    drawArc(strokeColor, 200f, 140f, false, androidx.compose.ui.geometry.Offset(center.x - 2.dp.toPx(), center.y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(40.dp.toPx(), 36.dp.toPx()), style = Stroke(2.dp.toPx()))
+    drawCircle(bgCircle, 21.dp.toPx(), center.copy(x = center.x + 56.dp.toPx(), y = center.y + 16.dp.toPx()))
+    drawCircle(strokeColor, 18.dp.toPx(), center.copy(x = center.x + 56.dp.toPx(), y = center.y + 16.dp.toPx()), style = Stroke(2.dp.toPx()))
   }
 }
 
@@ -693,10 +703,13 @@ fun SettingsScreen(
   onBack: () -> Unit,
   selectedLanguage: AppLanguage,
   onLanguageSelected: (AppLanguage) -> Unit,
+  selectedThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
+  onThemeModeSelected: (AppThemeMode) -> Unit = {},
   modifier: Modifier = Modifier,
   deviceIdentity: DeviceIdentity? = null,
   securityGate: SecurityGate? = null,
 ) {
+  var showThemeDialog by remember { mutableStateOf(false) }
   val identityState = deviceIdentity?.identityState?.collectAsStateWithLifecycle()?.value
     ?: DeviceIdentityState.Ready(DeviceIdentityInfo("", ""))
   val identitySummary = when (identityState) {
@@ -723,9 +736,15 @@ fun SettingsScreen(
     BiometricAvailability.UNSUPPORTED, null -> stringResource(R.string.biometric_status_unsupported)
   }
 
+  val themeSummary = when (selectedThemeMode) {
+    AppThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+    AppThemeMode.LIGHT -> stringResource(R.string.theme_light)
+    AppThemeMode.DARK -> stringResource(R.string.theme_dark)
+  }
+
   Scaffold(
     modifier,
-    containerColor = Navy950,
+    containerColor = PeykrTheme.colors.background,
     contentWindowInsets = WindowInsets.safeDrawing,
     bottomBar = { PremiumBottomNavigation(Settings, onNavigate) }
   ) { padding ->
@@ -737,9 +756,27 @@ fun SettingsScreen(
         PremiumInfoRow(
           PremiumIconKind.Theme,
           stringResource(R.string.theme_setting),
-          stringResource(R.string.theme_detail),
+          themeSummary,
           stringResource(R.string.theme_setting),
-          trailing = null
+          onClick = { showThemeDialog = true },
+          trailing = {
+            Text(
+              themeSummary,
+              color = PrimaryTurquoise,
+              style = MaterialTheme.typography.labelMedium
+            )
+          }
+        )
+      }
+
+      if (showThemeDialog) {
+        ThemeSelectionDialog(
+          selectedMode = selectedThemeMode,
+          onDismiss = { showThemeDialog = false },
+          onSelectMode = { mode ->
+            onThemeModeSelected(mode)
+            showThemeDialog = false
+          }
         )
       }
 
@@ -835,11 +872,82 @@ private fun BackAction(onBack: () -> Unit) {
 }
 
 @Composable
+private fun ThemeSelectionDialog(
+  selectedMode: AppThemeMode,
+  onDismiss: () -> Unit,
+  onSelectMode: (AppThemeMode) -> Unit
+) {
+  val options = listOf(
+    AppThemeMode.SYSTEM to stringResource(R.string.theme_system),
+    AppThemeMode.LIGHT to stringResource(R.string.theme_light),
+    AppThemeMode.DARK to stringResource(R.string.theme_dark)
+  )
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = PeykrTheme.colors.surface,
+    title = {
+      Text(
+        text = stringResource(R.string.theme_select_dialog_title),
+        style = MaterialTheme.typography.titleLarge,
+        color = PeykrTheme.colors.textPrimary,
+        fontWeight = FontWeight.Bold
+      )
+    },
+    text = {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+      ) {
+        options.forEach { (mode, label) ->
+          val isSelected = mode == selectedMode
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(8.dp))
+              .clickable { onSelectMode(mode) }
+              .padding(vertical = 10.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            RadioButton(
+              selected = isSelected,
+              onClick = { onSelectMode(mode) },
+              colors = RadioButtonDefaults.colors(
+                selectedColor = PeykrTheme.colors.primaryAccent,
+                unselectedColor = PeykrTheme.colors.textSecondary
+              )
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+              text = label,
+              color = if (isSelected) PeykrTheme.colors.primaryAccent else PeykrTheme.colors.textPrimary,
+              style = MaterialTheme.typography.bodyLarge,
+              fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+            )
+          }
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) {
+        Text(
+          stringResource(R.string.back_action),
+          color = PeykrTheme.colors.primaryAccent,
+          style = MaterialTheme.typography.labelLarge
+        )
+      }
+    }
+  )
+}
+
+@Composable
 private fun PremiumBottomNavigation(current: NavKey, onNavigate: (NavKey) -> Unit) {
+  val navBg = if (PeykrTheme.colors.isDark) Color(0xF20B1220) else Color(0xF8FFFFFF)
   Row(
     Modifier
       .fillMaxWidth()
-      .background(Color(0xF20B1220))
+      .background(navBg)
+      .border(0.5.dp, PeykrTheme.colors.border)
       .navigationBarsPadding()
       .height(72.dp)
       .padding(horizontal = 12.dp),

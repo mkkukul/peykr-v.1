@@ -23,6 +23,10 @@
     <string name="appearance_section">Görünüm</string>
     <string name="theme_setting">Tema</string>
     <string name="theme_detail">Koyu tema · Tasarım önceliği</string>
+    <string name="theme_system">Sistem varsayılanı</string>
+    <string name="theme_light">Açık tema</string>
+    <string name="theme_dark">Koyu tema</string>
+    <string name="theme_select_dialog_title">Tema Seçimi</string>
     <string name="language_section">Dil</string>
     <string name="language_setting">Uygulama dili</string>
     <string name="privacy_section">Gizlilik</string>

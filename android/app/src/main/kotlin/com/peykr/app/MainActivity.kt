@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,7 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.FragmentActivity
+import com.peykr.app.data.AppThemeMode
 import com.peykr.app.data.LanguagePreferenceStore
+import com.peykr.app.data.ThemePreferenceStore
 import com.peykr.app.localization.AppLanguage
 import com.peykr.app.ui.theme.PEYKRTheme
 import java.util.Locale
@@ -32,21 +35,44 @@ class MainActivity : FragmentActivity() {
 
     enableEdgeToEdge()
     val languageStore = LanguagePreferenceStore(this)
+    val themeStore = ThemePreferenceStore(this)
+
     setContent {
       var language by remember { mutableStateOf(languageStore.load()) }
+      var themeMode by remember { mutableStateOf(themeStore.load()) }
+
+      val isSystemDark = isSystemInDarkTheme()
+      val isDark = when (themeMode) {
+        AppThemeMode.SYSTEM -> isSystemDark
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+      }
+
       val localizedContext = remember(language) {
         val configuration = android.content.res.Configuration(resources.configuration)
         configuration.setLocale(Locale.forLanguageTag(language.languageTag))
         val configContext = createConfigurationContext(configuration)
         LocalizedActivityContext(this@MainActivity, configContext)
       }
+
       CompositionLocalProvider(
         LocalContext provides localizedContext,
         LocalActivityResultRegistryOwner provides this@MainActivity,
       ) {
-        PEYKRTheme(darkTheme = true) {
+        PEYKRTheme(darkTheme = isDark) {
           Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            MainNavigation(language, onLanguageSelected = { languageStore.save(it); language = it })
+            MainNavigation(
+              language = language,
+              onLanguageSelected = {
+                languageStore.save(it)
+                language = it
+              },
+              themeMode = themeMode,
+              onThemeModeSelected = {
+                themeStore.save(it)
+                themeMode = it
+              }
+            )
           }
         }
       }

@@ -295,7 +295,7 @@ private fun RoleSelectionContent(
       modifier = Modifier.fillMaxWidth().height(52.dp),
       colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
     ) {
-      Text(stringResource(R.string.pairing_mode_initiator), color = Navy950, fontWeight = FontWeight.Bold)
+      Text(stringResource(R.string.pairing_mode_initiator), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
     }
 
     Spacer(Modifier.height(16.dp))
@@ -347,7 +347,7 @@ private fun QrDisplayContent(
       modifier = Modifier.fillMaxWidth().height(50.dp),
       colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
     ) {
-      Text(buttonText, color = Navy950, fontWeight = FontWeight.Bold)
+      Text(buttonText, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
     }
   }
 }
@@ -434,9 +434,9 @@ private fun ReviewAndApproveContent(
       colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
     ) {
       if (isAuthenticating) {
-        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Navy950)
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
       } else {
-        Text(stringResource(R.string.pairing_review_action_approve), color = Navy950, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.pairing_review_action_approve), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
       }
     }
   }
@@ -471,7 +471,7 @@ private fun SuccessContent(
       modifier = Modifier.fillMaxWidth().height(50.dp),
       colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
     ) {
-      Text(stringResource(R.string.pairing_action_return_contacts), color = Navy950, fontWeight = FontWeight.Bold)
+      Text(stringResource(R.string.pairing_action_return_contacts), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
     }
   }
 }
@@ -498,7 +498,7 @@ private fun ErrorContent(
         modifier = Modifier.fillMaxWidth().height(50.dp),
         colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
       ) {
-        Text(stringResource(R.string.pairing_action_retry), color = Navy950, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.pairing_action_retry), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
       }
       Spacer(Modifier.height(12.dp))
     }

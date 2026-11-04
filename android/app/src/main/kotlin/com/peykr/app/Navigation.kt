@@ -9,6 +9,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.peykr.app.core.auth.SecurityGate
 import com.peykr.app.core.identity.DeviceIdentity
+import com.peykr.app.data.AppThemeMode
 import com.peykr.app.data.contacts.SqliteTrustedContactRepository
 import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.localization.AppLanguage
@@ -26,6 +27,8 @@ import com.peykr.app.ui.settings.LocationSharingDetailScreen
 fun MainNavigation(
   language: AppLanguage,
   onLanguageSelected: (AppLanguage) -> Unit,
+  themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+  onThemeModeSelected: (AppThemeMode) -> Unit = {},
   contactRepository: TrustedContactRepository? = null,
   deviceIdentity: DeviceIdentity? = null,
   securityGate: SecurityGate? = null,
@@ -74,6 +77,8 @@ fun MainNavigation(
             onBack = { backStack.removeLastOrNull() },
             selectedLanguage = language,
             onLanguageSelected = onLanguageSelected,
+            selectedThemeMode = themeMode,
+            onThemeModeSelected = onThemeModeSelected,
             deviceIdentity = identity,
             securityGate = gate,
           )

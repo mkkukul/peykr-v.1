@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -66,6 +68,8 @@ import com.peykr.app.core.identity.DeviceIdentityState
 import com.peykr.app.data.contacts.DatabaseState
 import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.ui.theme.AppHorizontalPadding
+import com.peykr.app.ui.theme.PeykrTheme
+import com.peykr.app.ui.theme.peykrEmblem
 import com.peykr.app.ui.theme.DarkPanel
 import com.peykr.app.ui.theme.DividerDark
 import com.peykr.app.ui.theme.Navy950
@@ -165,8 +169,8 @@ fun DeviceIdentityDetailScreen(
             lineHeight = 20.sp,
             modifier = Modifier
               .fillMaxWidth()
-              .background(Color(0xFF070D18), RoundedCornerShape(8.dp))
-              .border(1.dp, DividerDark, RoundedCornerShape(8.dp))
+              .background(PeykrTheme.colors.background, RoundedCornerShape(8.dp))
+              .border(1.dp, PeykrTheme.colors.border, RoundedCornerShape(8.dp))
               .padding(12.dp)
           )
         }
@@ -181,7 +185,7 @@ fun DeviceIdentityDetailScreen(
         ) {
           Text(
             if (copiedNotice) stringResource(R.string.detail_identity_copied_toast) else stringResource(R.string.detail_identity_copy_action),
-            color = Navy950,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontWeight = FontWeight.Bold
           )
         }
@@ -329,7 +333,7 @@ fun BiometricSettingsDetailScreen(
         colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
         modifier = Modifier.fillMaxWidth()
       ) {
-        Text(stringResource(R.string.detail_biometric_test_action), color = Navy950, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.detail_biometric_test_action), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
       }
 
       if (authStatusMessage != null) {
@@ -483,7 +487,7 @@ fun LocationSharingDetailScreen(
             }
           },
           colors = SwitchDefaults.colors(
-            checkedThumbColor = Navy950,
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
             checkedTrackColor = PrimaryTurquoise,
             uncheckedThumbColor = TextSecondary,
             uncheckedTrackColor = DarkPanel
@@ -572,7 +576,7 @@ fun DataBackupDetailScreen(
       colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
       modifier = Modifier.fillMaxWidth()
     ) {
-      Text(stringResource(R.string.detail_backup_verify_action), color = Navy950, fontWeight = FontWeight.Bold)
+      Text(stringResource(R.string.detail_backup_verify_action), color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
     }
   }
 }
@@ -593,7 +597,11 @@ fun AboutDetailScreen(
     // App Brand Card
     PremiumSurface(Modifier.fillMaxWidth()) {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        PremiumIcon(PremiumIconKind.Shield, "Peykr")
+        Image(
+          painter = peykrEmblem(),
+          contentDescription = "Peykr",
+          modifier = Modifier.size(44.dp)
+        )
         Spacer(Modifier.width(14.dp))
         Column {
           Text("Peykr", color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

@@ -135,7 +135,7 @@ fun CameraScannerView(
             },
             colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
           ) {
-            Text(stringResource(R.string.camera_init_retry), color = Navy950)
+            Text(stringResource(R.string.camera_init_retry), color = MaterialTheme.colorScheme.onPrimary)
           }
         }
       } else {
@@ -226,7 +226,7 @@ fun CameraScannerView(
           enabled = permissionLauncher != null,
           colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise),
         ) {
-          Text(stringResource(R.string.camera_permission_grant), color = Navy950)
+          Text(stringResource(R.string.camera_permission_grant), color = MaterialTheme.colorScheme.onPrimary)
         }
 
         Spacer(Modifier.height(8.dp))
