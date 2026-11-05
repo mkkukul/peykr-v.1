@@ -49,8 +49,17 @@ fun MainNavigation(
   val backStack = rememberNavBackStack(Main)
   fun navigateTo(key: NavKey) {
     if (backStack.lastOrNull() == key) return
-    while (backStack.size > 1 && backStack.contains(key)) backStack.removeLastOrNull()
-    backStack.add(key)
+    val topLevelTabs = setOf(Main, MessagesList, TrustedPeople, Settings)
+    if (key in topLevelTabs) {
+      while (backStack.size > 1) {
+        backStack.removeLastOrNull()
+      }
+      if (key != Main) {
+        backStack.add(key)
+      }
+    } else {
+      backStack.add(key)
+    }
   }
 
   NavDisplay(
@@ -146,6 +155,7 @@ fun MainNavigation(
             messagingEngine = msgEngine,
             onOpenConversation = { id, title -> navigateTo(ConversationDetail(id, title)) },
             onBack = { backStack.removeLastOrNull() },
+            onNavigate = ::navigateTo,
           )
         }
         entry<ConversationDetail> { key ->

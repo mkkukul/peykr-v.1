@@ -1,16 +1,20 @@
 package com.peykr.app.ui.calling
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,13 +31,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peykr.app.domain.calling.CallState
 import com.peykr.app.domain.calling.CallingEngine
-import com.peykr.app.ui.theme.Navy950
-import com.peykr.app.ui.theme.PrimaryTurquoise
-import com.peykr.app.ui.theme.TextPrimary
-import com.peykr.app.ui.theme.TextSecondary
+import com.peykr.app.ui.theme.ErrorRed
+import com.peykr.app.ui.theme.PeykrTheme
+import com.peykr.app.ui.theme.SuccessGreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -45,7 +49,8 @@ fun ActiveCallScreen(
   val coroutineScope = rememberCoroutineScope()
 
   Scaffold(
-    containerColor = Navy950,
+    containerColor = PeykrTheme.colors.background,
+    contentWindowInsets = WindowInsets.safeDrawing,
   ) { padding ->
     Column(
       modifier = Modifier
@@ -61,7 +66,7 @@ fun ActiveCallScreen(
         horizontalArrangement = Arrangement.Start
       ) {
         TextButton(onClick = onBack) {
-          Text("Geri", color = PrimaryTurquoise)
+          Text("‹ Geri", color = PeykrTheme.colors.primaryAccent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
       }
 
@@ -71,24 +76,29 @@ fun ActiveCallScreen(
           modifier = Modifier
             .size(110.dp)
             .clip(CircleShape)
-            .background(Color(0xFF1E3A5F)),
+            .background(PeykrTheme.colors.primarySubtle)
+            .border(2.dp, PeykrTheme.colors.primaryAccent.copy(alpha = 0.3f), CircleShape),
           contentAlignment = Alignment.Center
         ) {
           Text(
-            session?.contactDisplayName?.take(1)?.uppercase() ?: "P",
-            color = PrimaryTurquoise,
+            text = session?.contactDisplayName?.take(1)?.uppercase() ?: "P",
+            color = PeykrTheme.colors.primaryAccent,
             style = MaterialTheme.typography.displayMedium,
             fontWeight = FontWeight.Bold
           )
         }
-        Spacer(Modifier.height(16.dp))
+
+        Spacer(Modifier.height(18.dp))
+
         Text(
-          session?.contactDisplayName ?: "Arama",
-          color = TextPrimary,
+          text = session?.contactDisplayName ?: "Arama",
+          color = PeykrTheme.colors.textPrimary,
           style = MaterialTheme.typography.headlineMedium,
           fontWeight = FontWeight.Bold
         )
+
         Spacer(Modifier.height(8.dp))
+
         val stateText = when (session?.state) {
           CallState.OUTGOING_DIALING -> "Aranıyor…"
           CallState.INCOMING_RINGING -> "Gelen Çağrı…"
@@ -98,7 +108,12 @@ fun ActiveCallScreen(
           CallState.ENDED, CallState.REJECTED -> "Görüşme sonlandı"
           else -> "Hazır"
         }
-        Text(stateText, color = PrimaryTurquoise, style = MaterialTheme.typography.titleMedium)
+        Text(
+          text = stateText,
+          color = if (session?.state == CallState.CONNECTED) SuccessGreen else PeykrTheme.colors.primaryAccent,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
+        )
       }
 
       // Bottom: Action buttons
@@ -117,7 +132,7 @@ fun ActiveCallScreen(
                   coroutineScope.launch { callingEngine.acceptIncomingCall(s.callId) }
                 }
               },
-              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+              colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
               shape = CircleShape,
               modifier = Modifier.size(64.dp)
             ) {
@@ -130,7 +145,7 @@ fun ActiveCallScreen(
                   coroutineScope.launch { callingEngine.rejectIncomingCall(s.callId) }
                 }
               },
-              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+              colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
               shape = CircleShape,
               modifier = Modifier.size(64.dp)
             ) {
@@ -146,34 +161,34 @@ fun ActiveCallScreen(
             Button(
               onClick = { callingEngine.toggleMute() },
               colors = ButtonDefaults.buttonColors(
-                containerColor = if (session?.isMuted == true) Color(0xFFFFB74D) else Color(0xFF0F1E36)
+                containerColor = if (session?.isMuted == true) Color(0xFFFEF3C7) else PeykrTheme.colors.surfaceElevated
               ),
               shape = CircleShape,
               modifier = Modifier.size(54.dp)
             ) {
-              Text("🎤", color = Color.White)
+              Text("🎤", color = if (session?.isMuted == true) Color(0xFFD97706) else PeykrTheme.colors.textPrimary)
             }
 
             Button(
               onClick = { callingEngine.toggleSpeaker() },
               colors = ButtonDefaults.buttonColors(
-                containerColor = if (session?.isSpeakerOn == true) PrimaryTurquoise else Color(0xFF0F1E36)
+                containerColor = if (session?.isSpeakerOn == true) PeykrTheme.colors.primarySubtle else PeykrTheme.colors.surfaceElevated
               ),
               shape = CircleShape,
               modifier = Modifier.size(54.dp)
             ) {
-              Text("🔊", color = Color.White)
+              Text("🔊", color = if (session?.isSpeakerOn == true) PeykrTheme.colors.primaryAccent else PeykrTheme.colors.textPrimary)
             }
 
             Button(
               onClick = { callingEngine.toggleVideo() },
               colors = ButtonDefaults.buttonColors(
-                containerColor = if (session?.isVideoEnabled == true) PrimaryTurquoise else Color(0xFF0F1E36)
+                containerColor = if (session?.isVideoEnabled == true) PeykrTheme.colors.primarySubtle else PeykrTheme.colors.surfaceElevated
               ),
               shape = CircleShape,
               modifier = Modifier.size(54.dp)
             ) {
-              Text("📹", color = Color.White)
+              Text("📹", color = if (session?.isVideoEnabled == true) PeykrTheme.colors.primaryAccent else PeykrTheme.colors.textPrimary)
             }
           }
 
@@ -186,11 +201,11 @@ fun ActiveCallScreen(
                 coroutineScope.launch { callingEngine.endCall(s.callId) }
               } ?: onBack()
             },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
             shape = CircleShape,
             modifier = Modifier.size(64.dp)
           ) {
-            Text("☎", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            Text("✕", color = Color.White, style = MaterialTheme.typography.titleLarge)
           }
         }
       }

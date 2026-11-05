@@ -26,6 +26,7 @@ import com.peykr.app.data.AppThemeMode
 import com.peykr.app.data.LanguagePreferenceStore
 import com.peykr.app.data.ThemePreferenceStore
 import com.peykr.app.localization.AppLanguage
+import com.peykr.app.ui.splash.SplashScreen
 import com.peykr.app.ui.theme.PEYKRTheme
 import java.util.Locale
 
@@ -55,24 +56,30 @@ class MainActivity : FragmentActivity() {
         LocalizedActivityContext(this@MainActivity, configContext)
       }
 
+      var isSplashFinished by remember { mutableStateOf(false) }
+
       CompositionLocalProvider(
         LocalContext provides localizedContext,
         LocalActivityResultRegistryOwner provides this@MainActivity,
       ) {
         PEYKRTheme(darkTheme = isDark) {
           Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            MainNavigation(
-              language = language,
-              onLanguageSelected = {
-                languageStore.save(it)
-                language = it
-              },
-              themeMode = themeMode,
-              onThemeModeSelected = {
-                themeStore.save(it)
-                themeMode = it
-              }
-            )
+            if (!isSplashFinished) {
+              SplashScreen(onLoaded = { isSplashFinished = true })
+            } else {
+              MainNavigation(
+                language = language,
+                onLanguageSelected = {
+                  languageStore.save(it)
+                  language = it
+                },
+                themeMode = themeMode,
+                onThemeModeSelected = {
+                  themeStore.save(it)
+                  themeMode = it
+                }
+              )
+            }
           }
         }
       }

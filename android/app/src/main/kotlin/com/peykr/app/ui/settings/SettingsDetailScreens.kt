@@ -75,7 +75,6 @@ import com.peykr.app.data.contacts.DatabaseState
 import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.ui.theme.AppHorizontalPadding
 import com.peykr.app.ui.theme.PeykrTheme
-import com.peykr.app.ui.theme.peykrEmblem
 import com.peykr.app.ui.theme.DarkPanel
 import com.peykr.app.ui.theme.DividerDark
 import com.peykr.app.ui.theme.Navy950
@@ -709,11 +708,19 @@ fun AboutDetailScreen(
     // App Brand Card
     PremiumSurface(Modifier.fillMaxWidth()) {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Image(
-          painter = peykrEmblem(),
-          contentDescription = "Peykr",
-          modifier = Modifier.size(44.dp)
-        )
+        Box(
+          Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(PeykrTheme.colors.primarySubtle),
+          contentAlignment = Alignment.Center
+        ) {
+          PremiumIcon(
+            kind = PremiumIconKind.Shield,
+            description = "Peykr",
+            tint = PeykrTheme.colors.primaryAccent
+          )
+        }
         Spacer(Modifier.width(14.dp))
         Column {
           Text("Peykr", color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

@@ -1,16 +1,18 @@
 package com.peykr.app.ui.transfer
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,15 +35,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.peykr.app.domain.transfer.FileTransferEngine
 import com.peykr.app.domain.transfer.TransferDirection
 import com.peykr.app.domain.transfer.TransferSession
 import com.peykr.app.domain.transfer.TransferStatus
-import com.peykr.app.ui.theme.Navy950
-import com.peykr.app.ui.theme.PrimaryTurquoise
-import com.peykr.app.ui.theme.TextPrimary
-import com.peykr.app.ui.theme.TextSecondary
+import com.peykr.app.ui.theme.AppHorizontalPadding
+import com.peykr.app.ui.theme.ErrorRed
+import com.peykr.app.ui.theme.PeykrBadge
+import com.peykr.app.ui.theme.PeykrCard
+import com.peykr.app.ui.theme.PeykrTheme
+import com.peykr.app.ui.theme.PremiumIcon
+import com.peykr.app.ui.theme.PremiumIconKind
+import com.peykr.app.ui.theme.SuccessGreen
+import com.peykr.app.ui.theme.SuccessGreenLight
 
 @Composable
 fun FileTransferScreen(
@@ -52,13 +60,15 @@ fun FileTransferScreen(
   val sessions = sessionsMap.values.toList()
 
   Scaffold(
-    containerColor = Navy950,
+    containerColor = PeykrTheme.colors.background,
+    contentWindowInsets = WindowInsets.safeDrawing,
   ) { padding ->
     Column(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(16.dp)
+        .padding(horizontal = AppHorizontalPadding, vertical = 20.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
       // Header
       Row(
@@ -66,12 +76,12 @@ fun FileTransferScreen(
         verticalAlignment = Alignment.CenterVertically
       ) {
         TextButton(onClick = onBack) {
-          Text("Geri", color = PrimaryTurquoise)
+          Text("‹ Geri", color = PeykrTheme.colors.primaryAccent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
         Spacer(Modifier.weight(1f))
         Text(
           "Yerel Dosya Aktarımı",
-          color = TextPrimary,
+          color = PeykrTheme.colors.textPrimary,
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.Bold
         )
@@ -79,39 +89,56 @@ fun FileTransferScreen(
         Spacer(Modifier.width(48.dp))
       }
 
-      Spacer(Modifier.height(16.dp))
-
       // Discovery Status Card
-      Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(12.dp))
-          .background(Color(0xFF0F1E36))
-          .padding(16.dp)
+      PeykrCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = PeykrTheme.colors.surface,
+        borderColor = PeykrTheme.colors.border,
+        shape = RoundedCornerShape(16.dp)
       ) {
-        Column {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-              modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(PrimaryTurquoise)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("Yerel Ağ Keşfi Aktif (mDNS / Wi-Fi)", color = PrimaryTurquoise, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Box(
+            modifier = Modifier
+              .size(40.dp)
+              .clip(CircleShape)
+              .background(SuccessGreenLight),
+            contentAlignment = Alignment.Center
+          ) {
+            PremiumIcon(PremiumIconKind.File, "Dosya", tint = SuccessGreen)
           }
-          Spacer(Modifier.height(6.dp))
-          Text(
-            "Aynı Wi-Fi ağındaki veya doğrudan eşleşen cihazlara internet kotası harcamadan dosya gönderin.",
-            color = TextSecondary,
-            style = MaterialTheme.typography.bodySmall
+
+          Spacer(Modifier.width(14.dp))
+
+          Column(Modifier.weight(1f)) {
+            Text(
+              "Yerel Ağ Keşfi Aktif",
+              color = PeykrTheme.colors.textPrimary,
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+              "Aynı Wi-Fi ağındaki veya eşleşen cihazlara doğrudan dosya gönderin.",
+              color = PeykrTheme.colors.textSecondary,
+              style = MaterialTheme.typography.bodySmall
+            )
+          }
+
+          Box(
+            modifier = Modifier
+              .size(8.dp)
+              .clip(CircleShape)
+              .background(SuccessGreen)
           )
         }
       }
 
-      Spacer(Modifier.height(20.dp))
-      Text("Aktif Transferler", color = TextPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-      Spacer(Modifier.height(10.dp))
+      Text(
+        "Aktif Transferler",
+        color = PeykrTheme.colors.textPrimary,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold
+      )
 
       if (sessions.isEmpty()) {
         Box(
@@ -120,14 +147,32 @@ fun FileTransferScreen(
             .weight(1f),
           contentAlignment = Alignment.Center
         ) {
-          Text("Şu anda devam eden bir dosya aktarımı yok.", color = TextSecondary)
+          Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Box(
+              modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(PeykrTheme.colors.primarySubtle),
+              contentAlignment = Alignment.Center
+            ) {
+              PremiumIcon(PremiumIconKind.File, "Transfer", tint = PeykrTheme.colors.primaryAccent)
+            }
+            Text(
+              "Şu anda devam eden bir dosya aktarımı yok.",
+              color = PeykrTheme.colors.textSecondary,
+              style = MaterialTheme.typography.bodyMedium
+            )
+          }
         }
       } else {
         LazyColumn(
           modifier = Modifier.weight(1f),
           verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          items(sessions) { session ->
+          items(sessions, key = { it.sessionId }) { session ->
             TransferSessionCard(
               session = session,
               onAccept = { transferEngine.acceptTransfer(session.sessionId) },
@@ -148,61 +193,52 @@ private fun TransferSessionCard(
   onReject: () -> Unit,
   onCancel: () -> Unit,
 ) {
-  Box(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(12.dp))
-      .background(Color(0xFF0F1E36))
-      .padding(14.dp)
+  PeykrCard(
+    modifier = Modifier.fillMaxWidth(),
+    containerColor = PeykrTheme.colors.surface,
+    borderColor = PeykrTheme.colors.border,
+    shape = RoundedCornerShape(16.dp)
   ) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
       ) {
         val directionTag = if (session.direction == TransferDirection.SEND) "GÖNDERİLİYOR" else "ALINIYOR"
-        Text(
-          directionTag,
-          color = PrimaryTurquoise,
-          style = MaterialTheme.typography.labelSmall,
-          fontWeight = FontWeight.Bold
-        )
+        PeykrBadge(text = directionTag, color = PeykrTheme.colors.primaryAccent, backgroundColor = PeykrTheme.colors.primarySubtle)
         Spacer(Modifier.weight(1f))
-        Text(session.status.name, color = TextSecondary, style = MaterialTheme.typography.labelSmall)
+        Text(session.status.name, color = PeykrTheme.colors.textSecondary, style = MaterialTheme.typography.labelSmall)
       }
 
-      Spacer(Modifier.height(6.dp))
       Text(
         session.files.joinToString(", ") { it.fileName },
-        color = TextPrimary,
+        color = PeykrTheme.colors.textPrimary,
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = FontWeight.SemiBold
       )
-      Spacer(Modifier.height(4.dp))
+
       Text(
         "Cihaz: ${session.remoteDisplayName} (${formatBytes(session.totalBytes)})",
-        color = TextSecondary,
+        color = PeykrTheme.colors.textSecondary,
         style = MaterialTheme.typography.bodySmall
       )
 
       if (session.status == TransferStatus.TRANSFERRING) {
-        Spacer(Modifier.height(8.dp))
         LinearProgressIndicator(
           progress = { session.progressPercent / 100f },
-          modifier = Modifier.fillMaxWidth(),
-          color = PrimaryTurquoise,
-          trackColor = Color(0xFF1E3A5F),
+          modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+          color = PeykrTheme.colors.primaryAccent,
+          trackColor = PeykrTheme.colors.primarySubtle,
         )
-        Spacer(Modifier.height(4.dp))
         Text(
           "${"%.1f".format(session.progressPercent)}%",
-          color = PrimaryTurquoise,
-          style = MaterialTheme.typography.labelSmall
+          color = PeykrTheme.colors.primaryAccent,
+          style = MaterialTheme.typography.labelSmall,
+          fontWeight = FontWeight.Bold
         )
       }
 
       if (session.status == TransferStatus.WAITING_FOR_RECEIVER_APPROVAL && session.direction == TransferDirection.RECEIVE) {
-        Spacer(Modifier.height(10.dp))
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -210,15 +246,17 @@ private fun TransferSessionCard(
           Button(
             onClick = onAccept,
             modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTurquoise)
+            colors = ButtonDefaults.buttonColors(containerColor = PeykrTheme.colors.primaryAccent),
+            shape = RoundedCornerShape(10.dp)
           ) {
-            Text("Kabul Et", color = Color.White)
+            Text("Kabul Et", color = Color.White, fontWeight = FontWeight.Bold)
           }
           OutlinedButton(
             onClick = onReject,
             modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(10.dp)
           ) {
-            Text("Reddet", color = Color(0xFFFF8888))
+            Text("Reddet", color = ErrorRed)
           }
         }
       }
