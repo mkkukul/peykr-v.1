@@ -36,6 +36,7 @@ sealed interface PairingUiState {
     val session: PairingSession,
     val qrPayload: PairingQrPayload,
     val qrMatrix: QrMatrix,
+    val oneTimeCode: String = qrPayload.computeOneTimeCode(),
   ) : PairingUiState
 
   data class InitiatorScanRequest(
@@ -51,6 +52,8 @@ sealed interface PairingUiState {
     val errorMessage: String? = null,
     val authMethod: RequiredAuthMethod = RequiredAuthMethod.BIOMETRIC_OR_PIN,
     val showPinDialog: Boolean = false,
+    val showSetupPinDialog: Boolean = false,
+    val sasCode: String? = null,
   ) : PairingUiState
 
   data class InitiatorShowResponseQr(
@@ -78,6 +81,9 @@ sealed interface PairingUiState {
     val errorMessage: String? = null,
     val authMethod: RequiredAuthMethod = RequiredAuthMethod.BIOMETRIC_OR_PIN,
     val showPinDialog: Boolean = false,
+    val showSetupPinDialog: Boolean = false,
+    val sasCode: String? = null,
+    val oneTimeCode: String = payload.computeOneTimeCode(),
   ) : PairingUiState
 
   data class ResponderShowRequestQr(
@@ -199,11 +205,13 @@ class PairingViewModel(
         val fingerprint = remote?.deviceId?.let { formatFingerprint(it) } ?: "Unknown"
 
         val requiredAuth = securityGate.getRequiredAuthMethod()
+        val sas = updatedSession.transcript?.computeSasCode() ?: updatedSession.computeOneTimeCode()
         _uiState.value = PairingUiState.InitiatorReviewAndApprove(
           session = updatedSession,
           remoteName = remote?.displayName ?: "Unknown Device",
           remoteFingerprint = fingerprint,
           authMethod = requiredAuth,
+          sasCode = sas,
         )
       } finally {
         isProcessingScan.set(false)
@@ -214,9 +222,18 @@ class PairingViewModel(
   fun dismissPinDialog() {
     val current = _uiState.value
     if (current is PairingUiState.InitiatorReviewAndApprove) {
-      _uiState.value = current.copy(showPinDialog = false)
+      _uiState.value = current.copy(showPinDialog = false, showSetupPinDialog = false)
     } else if (current is PairingUiState.ResponderReviewAndApprove) {
-      _uiState.value = current.copy(showPinDialog = false)
+      _uiState.value = current.copy(showPinDialog = false, showSetupPinDialog = false)
+    }
+  }
+
+  fun openSetupPinDialog() {
+    val current = _uiState.value
+    if (current is PairingUiState.InitiatorReviewAndApprove) {
+      _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
+    } else if (current is PairingUiState.ResponderReviewAndApprove) {
+      _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
     }
   }
 
@@ -226,9 +243,7 @@ class PairingViewModel(
 
     when (securityGate.getRequiredAuthMethod()) {
       RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
-        _uiState.value = current.copy(
-          errorMessage = "PIN setup required: please configure your application PIN in Security Settings before approving devices."
-        )
+        _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
       }
       RequiredAuthMethod.PIN_REQUIRED -> {
         _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
@@ -251,7 +266,8 @@ class PairingViewModel(
             } else {
               _uiState.value = current.copy(
                 isAuthenticating = false,
-                errorMessage = "Authentication failed: ${error.message}",
+                showSetupPinDialog = true,
+                errorMessage = null,
               )
             }
             return@launch
@@ -278,6 +294,35 @@ class PairingViewModel(
         return@launch
       }
       _uiState.value = current.copy(showPinDialog = false)
+      executeInitiatorApproval(session, current, token)
+    }
+  }
+
+  fun setupInlinePinForInitiator(pin: String) {
+    val session = activeSession ?: return
+    val current = _uiState.value as? PairingUiState.InitiatorReviewAndApprove ?: return
+
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
+    scope.launch {
+      val setupResult = securityGate.setupPin(pin)
+      if (setupResult.isFailure) {
+        _uiState.value = current.copy(
+          isAuthenticating = false,
+          showSetupPinDialog = true,
+          errorMessage = "PIN kurulumu başarısız: ${setupResult.exceptionOrNull()?.message}",
+        )
+        return@launch
+      }
+      val authResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, pin)
+      val token = authResult.getOrElse { error ->
+        _uiState.value = current.copy(
+          isAuthenticating = false,
+          showSetupPinDialog = false,
+          errorMessage = "Yetkilendirme başarısız: ${error.message}",
+        )
+        return@launch
+      }
+      _uiState.value = current.copy(showSetupPinDialog = false)
       executeInitiatorApproval(session, current, token)
     }
   }
@@ -405,12 +450,14 @@ class PairingViewModel(
         }
 
         val requiredAuth = securityGate.getRequiredAuthMethod()
+        val code = payload.computeOneTimeCode()
         _uiState.value = PairingUiState.ResponderReviewAndApprove(
           qrPayloadString = scannedString,
           payload = payload,
           remoteName = remoteIdentity.displayName,
           remoteFingerprint = formatFingerprint(remoteIdentity.deviceId),
           authMethod = requiredAuth,
+          oneTimeCode = code,
         )
       } finally {
         isProcessingScan.set(false)
@@ -423,9 +470,7 @@ class PairingViewModel(
 
     when (securityGate.getRequiredAuthMethod()) {
       RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
-        _uiState.value = current.copy(
-          errorMessage = "PIN setup required: please configure your application PIN in Security Settings before approving devices."
-        )
+        _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
       }
       RequiredAuthMethod.PIN_REQUIRED -> {
         _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
@@ -448,7 +493,8 @@ class PairingViewModel(
             } else {
               _uiState.value = current.copy(
                 isAuthenticating = false,
-                errorMessage = "Authentication required to pair: ${error.message}",
+                showSetupPinDialog = true,
+                errorMessage = null,
               )
             }
             return@launch
@@ -474,6 +520,34 @@ class PairingViewModel(
         return@launch
       }
       _uiState.value = current.copy(showPinDialog = false)
+      executeResponderApproval(current, token, responderDisplayName)
+    }
+  }
+
+  fun setupInlinePinForResponder(pin: String, responderDisplayName: String = defaultDeviceName) {
+    val current = _uiState.value as? PairingUiState.ResponderReviewAndApprove ?: return
+
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
+    scope.launch {
+      val setupResult = securityGate.setupPin(pin)
+      if (setupResult.isFailure) {
+        _uiState.value = current.copy(
+          isAuthenticating = false,
+          showSetupPinDialog = true,
+          errorMessage = "PIN kurulumu başarısız: ${setupResult.exceptionOrNull()?.message}",
+        )
+        return@launch
+      }
+      val authResult = securityGate.authorizeWithPin(SecurityGateScope.APPROVE_TRUSTED_DEVICE, pin)
+      val token = authResult.getOrElse { error ->
+        _uiState.value = current.copy(
+          isAuthenticating = false,
+          showSetupPinDialog = false,
+          errorMessage = "Yetkilendirme başarısız: ${error.message}",
+        )
+        return@launch
+      }
+      _uiState.value = current.copy(showSetupPinDialog = false)
       executeResponderApproval(current, token, responderDisplayName)
     }
   }

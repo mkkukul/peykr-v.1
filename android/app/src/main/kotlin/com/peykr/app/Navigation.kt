@@ -162,11 +162,13 @@ fun MainNavigation(
           val appContainer = context.applicationContext as? AppContainer
           val msgRepo = appContainer?.messagingRepository ?: error("MessagingRepository required")
           val msgEngine = appContainer.messagingEngine
+          val transportMgr = appContainer.transportManager
           ConversationDetailScreen(
             conversationId = key.conversationId,
             title = key.title,
             messagingRepository = msgRepo,
             messagingEngine = msgEngine,
+            transportManager = transportMgr,
             onStartCall = { contactId, name ->
               val callingEngine = appContainer.callingEngine
               kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
@@ -190,6 +192,8 @@ fun MainNavigation(
           val transferEngine = appContainer?.fileTransferEngine ?: error("FileTransferEngine required")
           FileTransferScreen(
             transferEngine = transferEngine,
+            discovery = appContainer.localNetworkDiscovery,
+            httpClient = appContainer.localHttpClient,
             onBack = { backStack.removeLastOrNull() },
           )
         }

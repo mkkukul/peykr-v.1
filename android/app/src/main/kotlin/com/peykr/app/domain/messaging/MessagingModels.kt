@@ -4,11 +4,20 @@ import kotlinx.coroutines.flow.Flow
 
 enum class MessageStatus {
   PENDING,
+  QUEUED_OFFLINE,
   SENDING,
   SENT,
   DELIVERED,
   READ,
   FAILED
+}
+
+enum class MessageTransportType {
+  DIRECT_P2P,
+  LOCAL_WIFI,
+  BLUETOOTH_MESH,
+  ONLINE_RELAY,
+  OFFLINE_QUEUED
 }
 
 enum class MessageDirection {
@@ -35,6 +44,8 @@ data class Message(
   val direction: MessageDirection = MessageDirection.OUTGOING,
   val timestamp: Long = System.currentTimeMillis(),
   val isRead: Boolean = true,
+  val transportType: MessageTransportType = MessageTransportType.DIRECT_P2P,
+  val verifiedDeliveryEpochMillis: Long? = null,
 )
 
 data class Conversation(
@@ -60,6 +71,12 @@ interface MessagingRepository {
   suspend fun saveConversation(conversation: Conversation)
   suspend fun saveMessage(message: Message)
   suspend fun updateMessageStatus(messageId: String, status: MessageStatus)
+  suspend fun updateMessageDelivery(
+    messageId: String,
+    status: MessageStatus,
+    transportType: MessageTransportType,
+    deliveryTime: Long? = System.currentTimeMillis()
+  )
   suspend fun deleteMessage(messageId: String)
   suspend fun deleteConversation(conversationId: String)
   suspend fun getGroupMembers(conversationId: String): List<GroupMember>

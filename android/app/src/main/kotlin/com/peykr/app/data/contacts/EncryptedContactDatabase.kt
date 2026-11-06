@@ -195,6 +195,10 @@ class EncryptedContactDatabase(private val context: Context, databaseName: Strin
 
     database.execSQL("CREATE TABLE IF NOT EXISTS conversation_members (conversation_id TEXT NOT NULL, contact_id TEXT NOT NULL, role TEXT NOT NULL, joined_at INTEGER NOT NULL, PRIMARY KEY (conversation_id, contact_id))")
     database.execSQL("CREATE TABLE IF NOT EXISTS call_logs (id TEXT PRIMARY KEY NOT NULL, contact_id TEXT NOT NULL, call_type TEXT NOT NULL, direction TEXT NOT NULL, status TEXT NOT NULL, started_at INTEGER NOT NULL, duration_seconds INTEGER NOT NULL DEFAULT 0)")
+
+    // Non-destructive column additions for transport verification
+    runCatching { database.execSQL("ALTER TABLE messages ADD COLUMN transport_type TEXT") }
+    runCatching { database.execSQL("ALTER TABLE messages ADD COLUMN verified_delivery_time INTEGER") }
   }
 
   private fun verifyDatabase(database: SQLiteDatabase) {

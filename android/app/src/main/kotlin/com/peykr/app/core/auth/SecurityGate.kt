@@ -17,6 +17,7 @@ sealed class SecurityGateException(message: String, cause: Throwable? = null) : 
 interface SecurityGate {
   fun canAuthenticate(allowDeviceCredential: Boolean = true): BiometricAvailability
   fun isPinConfigured(): Boolean
+  fun setupPin(pin: String): Result<Unit>
   fun getRequiredAuthMethod(): RequiredAuthMethod
   suspend fun authorize(scope: SecurityGateScope, config: AuthPromptConfig): Result<AuthorizationToken>
   suspend fun authorizeWithPin(scope: SecurityGateScope, pin: String): Result<AuthorizationToken>

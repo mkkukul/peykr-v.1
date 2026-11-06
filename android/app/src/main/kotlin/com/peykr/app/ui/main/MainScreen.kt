@@ -17,6 +17,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.peykr.app.AppContainer
+import com.peykr.app.domain.location.LocationCoordinates
+import com.peykr.app.domain.location.LocationShareMode
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -121,9 +134,26 @@ fun MainScreen(
   val isIdentityOk = idState is DeviceIdentityState.Ready
   val isOverallSecure = isDbOk && isIdentityOk
 
+  val context = LocalContext.current
+  val coroutineScope = rememberCoroutineScope()
+  val appContainer = context.applicationContext as? AppContainer
+  val locationSafetyEngine = appContainer?.locationSafetyEngine
+  val transportManager = appContainer?.transportManager
+  val locationManager = remember(context) { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
+  val contactList by contactRepository.contacts.collectAsStateWithLifecycle(emptyList())
+
+  val activeSharesMap by (locationSafetyEngine?.activeShares?.collectAsStateWithLifecycle(emptyMap()) ?: remember { mutableStateOf(emptyMap()) })
+  val activeLiveSessions = activeSharesMap.values.filter { it.isActive }
+
   var showSosDialog by remember { mutableStateOf(false) }
+  var isSendingSos by remember { mutableStateOf(false) }
   var showSosConfirmedNotification by remember { mutableStateOf(false) }
+  var sosDeliverySummary by remember { mutableStateOf("") }
   var showNotificationAlert by remember { mutableStateOf(false) }
+
+  val locationPermissionLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { _ -> }
 
   Scaffold(
     modifier = modifier,
@@ -350,6 +380,54 @@ fun MainScreen(
           }
         }
 
+        if (activeLiveSessions.isNotEmpty()) {
+          PeykrCard(
+            containerColor = Color(0xFFEFF6FF),
+            borderColor = Color(0xFFBFDBFE),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(42.dp)
+                  .clip(CircleShape)
+                  .background(PastelBlueBg),
+                contentAlignment = Alignment.Center
+              ) {
+                PremiumIcon(PremiumIconKind.Location, "", tint = PastelBlueFg, modifier = Modifier.size(20.dp))
+              }
+              Spacer(Modifier.width(12.dp))
+              Column(Modifier.weight(1f)) {
+                Text(
+                  text = "Canlı Konum Paylaşımı Aktif",
+                  style = MaterialTheme.typography.titleSmall,
+                  fontWeight = FontWeight.Bold,
+                  color = Color(0xFF1E3A8A)
+                )
+                Text(
+                  text = "${activeLiveSessions.size} kişi ile anlık konum paylaşılıyor",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = Color(0xFF1E40AF)
+                )
+              }
+              Button(
+                onClick = {
+                  activeLiveSessions.forEach { locationSafetyEngine?.stopSharing(it.sessionId) }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+              ) {
+                Text("Durdur", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+              }
+            }
+          }
+        }
+
         // Premium Emergency SOS Component
         PeykrCard(
           onClick = { showSosDialog = true },
@@ -428,8 +506,8 @@ fun MainScreen(
   // SOS Confirmation Dialog
   if (showSosDialog) {
     AlertDialog(
-      onDismissRequest = { showSosDialog = false },
-      containerColor = Color.White,
+      onDismissRequest = { if (!isSendingSos) showSosDialog = false },
+      containerColor = PeykrTheme.colors.surface,
       shape = RoundedCornerShape(22.dp),
       title = {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -445,7 +523,7 @@ fun MainScreen(
           Text(
             text = "Acil Durum Bildirimi",
             style = MaterialTheme.typography.titleLarge,
-            color = Color(0xFF991B1B),
+            color = Color(0xFFDC2626),
             fontWeight = FontWeight.Bold,
             fontSize = 19.sp
           )
@@ -455,7 +533,7 @@ fun MainScreen(
         Text(
           text = "Kayıtlı güvenilir kişilerinize konum bilginiz ve acil durum uyarısı şifrelenerek iletilecektir. Bu işlemi onaylıyor musunuz?",
           style = MaterialTheme.typography.bodyMedium,
-          color = Color(0xFF334155),
+          color = PeykrTheme.colors.textSecondary,
           fontSize = 14.5.sp,
           lineHeight = 21.sp
         )
@@ -463,18 +541,92 @@ fun MainScreen(
       confirmButton = {
         Button(
           onClick = {
-            showSosDialog = false
-            showSosConfirmedNotification = true
+            coroutineScope.launch {
+              isSendingSos = true
+              val hasFinePermission = ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+              ) == PackageManager.PERMISSION_GRANTED
+              val hasCoarsePermission = ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+              ) == PackageManager.PERMISSION_GRANTED
+
+              if (!hasFinePermission && !hasCoarsePermission) {
+                locationPermissionLauncher.launch(
+                  arrayOf(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                  )
+                )
+              }
+
+              val loc = if (hasFinePermission || hasCoarsePermission) {
+                try {
+                  locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                    ?: locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                    ?: locationManager?.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+                } catch (e: SecurityException) {
+                  null
+                }
+              } else null
+
+              val coords = if (loc != null) {
+                LocationCoordinates(loc.latitude, loc.longitude, loc.accuracy, System.currentTimeMillis())
+              } else null
+
+              val paired = contactList.filter { it.pairingStatus == PairingStatus.PAIRED }
+              val recipients = if (paired.isNotEmpty()) paired else contactList
+
+              val sosText = if (coords != null) {
+                "🚨 ACİL DURUM (SOS): Canlı konumum https://maps.google.com/?q=${coords.latitude},${coords.longitude} (Doğruluk: ${coords.accuracyMeters.toInt()}m)"
+              } else if (!hasFinePermission && !hasCoarsePermission) {
+                "🚨 ACİL DURUM (SOS): Acil yardım çağrısı! (Konum izni verilmedi)"
+              } else {
+                "🚨 ACİL DURUM (SOS): Acil yardım çağrısı! (GPS uydusu kilitlenemedi veya konum servisleri kapalı)"
+              }
+
+              for (contact in recipients) {
+                if (coords != null) {
+                  locationSafetyEngine?.startSharingLocation(
+                    recipientContactId = contact.id,
+                    mode = LocationShareMode.LIVE,
+                    durationSeconds = 3600L,
+                    initialLocation = coords,
+                  )
+                  locationSafetyEngine?.createSignedLocationPayload(coords)
+                }
+                transportManager?.sendReliableMessage(
+                  conversationId = "conv_${contact.id}",
+                  recipientDeviceId = contact.id,
+                  text = sosText,
+                  recipientPublicKeyBase64 = contact.publicIdentity,
+                )
+              }
+              isSendingSos = false
+              showSosDialog = false
+              sosDeliverySummary = if (coords != null) {
+                "Acil durum sinyali ve doğrulanmış GPS konumunuz (${coords.latitude.toString().take(7)}, ${coords.longitude.toString().take(7)}) uçtan uca şifrelenerek ${recipients.size} güvenilir kişiye iletildi."
+              } else {
+                "Acil durum sinyali iletildi. Not: Cihaz konum koordinatları alınamadığı için konum verisi eklenemedi."
+              }
+              showSosConfirmedNotification = true
+            }
           },
+          enabled = !isSendingSos,
           colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
           shape = RoundedCornerShape(12.dp)
         ) {
-          Text("Evet, Gönder", color = Color.White, fontWeight = FontWeight.Bold)
+          if (isSendingSos) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+          } else {
+            Text("Evet, Gönder", color = Color.White, fontWeight = FontWeight.Bold)
+          }
         }
       },
       dismissButton = {
-        TextButton(onClick = { showSosDialog = false }) {
-          Text("İptal", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+        TextButton(onClick = { if (!isSendingSos) showSosDialog = false }) {
+          Text("İptal", color = PeykrTheme.colors.textSecondary, fontWeight = FontWeight.SemiBold)
         }
       }
     )
@@ -483,14 +635,14 @@ fun MainScreen(
   if (showSosConfirmedNotification) {
     AlertDialog(
       onDismissRequest = { showSosConfirmedNotification = false },
-      containerColor = Color.White,
+      containerColor = PeykrTheme.colors.surface,
       shape = RoundedCornerShape(22.dp),
       title = { Text("SOS İletildi", color = SuccessGreen, fontWeight = FontWeight.Bold) },
-      text = { Text("Acil durum sinyali ve güvenli konumunuz şifrelenerek güvenilir kişilere gönderildi.", color = Color(0xFF334155)) },
+      text = { Text(sosDeliverySummary, color = PeykrTheme.colors.textPrimary) },
       confirmButton = {
         Button(
           onClick = { showSosConfirmedNotification = false },
-          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E60D5)),
+          colors = ButtonDefaults.buttonColors(containerColor = PeykrTheme.colors.primaryAccent),
           shape = RoundedCornerShape(12.dp)
         ) {
           Text("Tamam", color = Color.White)
@@ -900,7 +1052,7 @@ private fun ContactCard(
 
         Spacer(Modifier.height(4.dp))
 
-        val fingerprint = contact.deviceFingerprint ?: contact.id
+        val fingerprint = contact.publicIdentity ?: contact.id
         Text(
           text = formatFingerprintShort(fingerprint),
           color = Color(0xFF94A3B8),
@@ -1137,12 +1289,12 @@ fun SettingsScreen(
   if (showThemeDialog) {
     AlertDialog(
       onDismissRequest = { showThemeDialog = false },
-      containerColor = Color.White,
+      containerColor = PeykrTheme.colors.surface,
       shape = RoundedCornerShape(22.dp),
       title = {
         Text(
           text = "Tema Seçimi",
-          color = Color(0xFF0F172A),
+          color = PeykrTheme.colors.textPrimary,
           style = MaterialTheme.typography.titleLarge,
           fontWeight = FontWeight.Bold
         )
@@ -1178,7 +1330,7 @@ fun SettingsScreen(
       confirmButton = {},
       dismissButton = {
         TextButton(onClick = { showThemeDialog = false }) {
-          Text("Kapat", color = Color(0xFF1E60D5))
+          Text("Kapat", color = PeykrTheme.colors.primaryAccent)
         }
       }
     )
@@ -1190,7 +1342,7 @@ private fun SettingsSectionHeader(title: String) {
   Text(
     text = title,
     style = MaterialTheme.typography.labelMedium,
-    color = Color(0xFF64748B),
+    color = PeykrTheme.colors.textSecondary,
     fontWeight = FontWeight.Bold,
     fontSize = 11.5.sp,
     letterSpacing = 0.8.sp,
@@ -1215,12 +1367,15 @@ private fun ThemeOptionItem(
     RadioButton(
       selected = selected,
       onClick = onSelect,
-      colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF1E60D5))
+      colors = RadioButtonDefaults.colors(
+        selectedColor = PeykrTheme.colors.primaryAccent,
+        unselectedColor = PeykrTheme.colors.textSecondary
+      )
     )
     Spacer(Modifier.width(8.dp))
     Text(
       text = title,
-      color = Color(0xFF0F172A),
+      color = PeykrTheme.colors.textPrimary,
       style = MaterialTheme.typography.bodyLarge,
       fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
     )

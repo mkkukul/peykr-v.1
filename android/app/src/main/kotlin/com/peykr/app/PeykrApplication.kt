@@ -7,22 +7,34 @@ import androidx.fragment.app.FragmentActivity
 import com.peykr.app.core.auth.AndroidBiometricAuthenticator
 import com.peykr.app.core.auth.BiometricAuthenticator
 import com.peykr.app.core.auth.DefaultSecurityGate
+import com.peykr.app.core.auth.PinSecurityManager
 import com.peykr.app.core.auth.SecurityGate
+import com.peykr.app.core.auth.SharedPreferencesPinStorage
 import com.peykr.app.core.identity.AndroidKeyStoreDeviceIdentity
 import com.peykr.app.core.identity.DeviceIdentity
+import com.peykr.app.core.identity.getOrNull
 import com.peykr.app.data.contacts.SqliteTrustedContactRepository
-import com.peykr.app.domain.contacts.TrustedContactRepository
-import com.peykr.app.core.auth.PinSecurityManager
-import com.peykr.app.core.auth.SharedPreferencesPinStorage
 import com.peykr.app.data.messaging.SqliteMessagingRepository
 import com.peykr.app.domain.calling.CallingEngine
 import com.peykr.app.domain.calling.DefaultCallingEngine
+import com.peykr.app.domain.contacts.TrustedContactRepository
+import com.peykr.app.domain.localsend.LocalHttpClient
+import com.peykr.app.domain.localsend.LocalHttpServer
+import com.peykr.app.domain.localsend.LocalNetworkDiscovery
 import com.peykr.app.domain.location.LocationSafetyEngine
+import com.peykr.app.domain.mesh.BleMeshEngine
+import com.peykr.app.domain.mesh.BleMeshTransport
+import com.peykr.app.domain.messaging.MessageStatus
+import com.peykr.app.domain.messaging.MessageTransportType
 import com.peykr.app.domain.messaging.MessagingEngine
 import com.peykr.app.domain.messaging.MessagingRepository
 import com.peykr.app.domain.pairing.DefaultPairingEngine
 import com.peykr.app.domain.pairing.PairingEngine
 import com.peykr.app.domain.transfer.FileTransferEngine
+import com.peykr.app.domain.transport.TransportManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.lang.ref.WeakReference
 
@@ -38,6 +50,12 @@ interface AppContainer {
   val callingEngine: CallingEngine
   val fileTransferEngine: FileTransferEngine
   val locationSafetyEngine: LocationSafetyEngine
+  val bleMeshEngine: BleMeshEngine
+  val bleMeshTransport: BleMeshTransport
+  val localNetworkDiscovery: LocalNetworkDiscovery
+  val localHttpServer: LocalHttpServer
+  val localHttpClient: LocalHttpClient
+  val transportManager: TransportManager
 }
 
 class PeykrApplication : Application(), AppContainer {
@@ -100,6 +118,90 @@ class PeykrApplication : Application(), AppContainer {
     )
   }
 
+  override val bleMeshEngine: BleMeshEngine by lazy {
+    val id = deviceIdentity.getOrCreate().getOrNull()?.id ?: "local"
+    BleMeshEngine(localDeviceId = id)
+  }
+
+  override val bleMeshTransport: BleMeshTransport by lazy {
+    BleMeshTransport(this, bleMeshEngine)
+  }
+
+  override val localHttpServer: LocalHttpServer by lazy {
+    val id = deviceIdentity.getOrCreate().getOrNull()?.id ?: "local"
+    val fp = deviceIdentity.getOrCreate().getOrNull()?.publicKey ?: ""
+    LocalHttpServer(
+      localDeviceId = id,
+      localDisplayName = "Peykr Cihazı",
+      localFingerprint = fp,
+      fileTransferEngine = fileTransferEngine,
+      messagingEngine = messagingEngine,
+      contactRepository = contactRepository,
+      onDirectMessageReceived = { msg ->
+        CoroutineScope(Dispatchers.IO).launch {
+          val senderId = msg.senderId
+          val convId = "conv_$senderId"
+          val contact = contactRepository.getById(senderId)
+          val title = contact?.displayName ?: "Peykr Kullanıcısı"
+
+          messagingRepository.saveConversation(
+            com.peykr.app.domain.messaging.Conversation(
+              id = convId,
+              title = title,
+              isGroup = false,
+              createdAt = System.currentTimeMillis(),
+              updatedAt = msg.timestamp,
+              lastMessage = msg.textContent ?: "Mesaj alındı",
+              unreadCount = 1,
+            )
+          )
+
+          messagingRepository.saveMessage(
+            msg.copy(
+              conversationId = convId,
+              direction = com.peykr.app.domain.messaging.MessageDirection.INCOMING,
+              status = MessageStatus.DELIVERED,
+              transportType = MessageTransportType.LOCAL_WIFI,
+              verifiedDeliveryEpochMillis = System.currentTimeMillis(),
+              isRead = false,
+            )
+          )
+        }
+      }
+    )
+  }
+
+  override val localNetworkDiscovery: LocalNetworkDiscovery by lazy {
+    val id = deviceIdentity.getOrCreate().getOrNull()?.id ?: "local"
+    val fp = deviceIdentity.getOrCreate().getOrNull()?.publicKey ?: ""
+    LocalNetworkDiscovery(
+      context = this,
+      localDeviceId = id,
+      localDisplayName = "Peykr Cihazı",
+      localPort = localHttpServer.boundPort,
+      localFingerprint = fp,
+    )
+  }
+
+  override val localHttpClient: LocalHttpClient by lazy {
+    val id = deviceIdentity.getOrCreate().getOrNull()?.id ?: "local"
+    LocalHttpClient(localDeviceId = id, localDisplayName = "Peykr Cihazı")
+  }
+
+  override val transportManager: TransportManager by lazy {
+    val id = deviceIdentity.getOrCreate().getOrNull()?.id ?: "local"
+    TransportManager(
+      localDeviceId = id,
+      localDisplayName = "Peykr Cihazı",
+      messagingRepository = messagingRepository,
+      messagingEngine = messagingEngine,
+      bleMeshEngine = bleMeshEngine,
+      localNetworkDiscovery = localNetworkDiscovery,
+      localHttpClient = localHttpClient,
+      contactRepository = contactRepository,
+    )
+  }
+
   override fun onCreate() {
     super.onCreate()
     registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
@@ -127,11 +229,23 @@ class PeykrApplication : Application(), AppContainer {
     })
 
     deviceIdentity.initialize()
+
+    // Start local background mesh & Wi-Fi transports safely
+    try {
+      localHttpServer.start()
+      localNetworkDiscovery.start()
+      bleMeshTransport.start()
+    } catch (e: Exception) {
+      android.util.Log.w("PeykrApp", "Transports initialized with fallbacks: ${e.message}")
+    }
   }
 
   override fun onTerminate() {
     super.onTerminate()
     deviceIdentity.close()
+    localNetworkDiscovery.stop()
+    localHttpServer.stop()
+    bleMeshTransport.stop()
     (contactRepository as? SqliteTrustedContactRepository)?.close()
     (messagingRepository as? SqliteMessagingRepository)?.close()
   }

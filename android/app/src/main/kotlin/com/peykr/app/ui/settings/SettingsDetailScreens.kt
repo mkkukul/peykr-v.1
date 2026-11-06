@@ -75,6 +75,7 @@ import com.peykr.app.data.contacts.DatabaseState
 import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.ui.theme.AppHorizontalPadding
 import com.peykr.app.ui.theme.PeykrTheme
+import com.peykr.app.ui.theme.PeykrScreenContainer
 import com.peykr.app.ui.theme.DarkPanel
 import com.peykr.app.ui.theme.DividerDark
 import com.peykr.app.ui.theme.Navy950
@@ -96,22 +97,28 @@ private fun DetailPage(
   content: @Composable ColumnScope.() -> Unit
 ) {
   Scaffold(
-    containerColor = Navy950,
+    containerColor = Color.Transparent,
     contentWindowInsets = WindowInsets.safeDrawing,
   ) { padding ->
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState())
-        .padding(padding)
-        .padding(horizontal = AppHorizontalPadding, vertical = 20.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-      TextButton(onClick = onBack) {
-        Text(stringResource(R.string.back_action), color = PrimaryTurquoise)
+    PeykrScreenContainer {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .verticalScroll(rememberScrollState())
+          .padding(padding)
+          .padding(horizontal = AppHorizontalPadding, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        TextButton(onClick = onBack) {
+          Text(
+            stringResource(R.string.back_action),
+            color = PeykrTheme.colors.primaryAccent,
+            fontWeight = FontWeight.SemiBold
+          )
+        }
+        SectionHeader(title = title, supportingText = subtitle)
+        content()
       }
-      SectionHeader(title = title, supportingText = subtitle)
-      content()
     }
   }
 }
@@ -598,10 +605,10 @@ fun LocationSharingDetailScreen(
             }
           },
           colors = SwitchDefaults.colors(
-            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-            checkedTrackColor = PrimaryTurquoise,
-            uncheckedThumbColor = TextSecondary,
-            uncheckedTrackColor = DarkPanel
+            checkedThumbColor = PeykrTheme.colors.onPrimary,
+            checkedTrackColor = PeykrTheme.colors.primaryAccent,
+            uncheckedThumbColor = PeykrTheme.colors.textSecondary,
+            uncheckedTrackColor = PeykrTheme.colors.border
           )
         )
       }

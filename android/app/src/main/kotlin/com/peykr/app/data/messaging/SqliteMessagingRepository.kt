@@ -9,6 +9,7 @@ import com.peykr.app.domain.messaging.GroupMember
 import com.peykr.app.domain.messaging.Message
 import com.peykr.app.domain.messaging.MessageDirection
 import com.peykr.app.domain.messaging.MessageStatus
+import com.peykr.app.domain.messaging.MessageTransportType
 import com.peykr.app.domain.messaging.MessagingRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -82,6 +83,8 @@ class SqliteMessagingRepository(
       put("direction", message.direction.name)
       put("timestamp", message.timestamp)
       put("is_read", if (message.isRead) 1 else 0)
+      put("transport_type", message.transportType.name)
+      put("verified_delivery_time", message.verifiedDeliveryEpochMillis)
     }
     db.insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_REPLACE)
 
@@ -105,6 +108,30 @@ class SqliteMessagingRepository(
     db.update("messages", values, "id = ?", arrayOf(messageId))
 
     // Query conversation ID to refresh
+    var convId: String? = null
+    db.query("messages", arrayOf("conversation_id"), "id = ?", arrayOf(messageId), null, null, null).use { cursor ->
+      if (cursor.moveToFirst()) {
+        convId = cursor.getString(0)
+      }
+    }
+    convId?.let { refreshMessages(it) }
+    Unit
+  }
+
+  override suspend fun updateMessageDelivery(
+    messageId: String,
+    status: MessageStatus,
+    transportType: MessageTransportType,
+    deliveryTime: Long?
+  ): Unit = withContext(Dispatchers.IO) {
+    val db = getDatabase()
+    val values = ContentValues().apply {
+      put("status", status.name)
+      put("transport_type", transportType.name)
+      put("verified_delivery_time", deliveryTime)
+    }
+    db.update("messages", values, "id = ?", arrayOf(messageId))
+
     var convId: String? = null
     db.query("messages", arrayOf("conversation_id"), "id = ?", arrayOf(messageId), null, null, null).use { cursor ->
       if (cursor.moveToFirst()) {
@@ -220,18 +247,16 @@ class SqliteMessagingRepository(
       val list = mutableListOf<Message>()
       db.query(
         "messages",
-        arrayOf(
-          "id", "conversation_id", "sender_id", "recipient_id",
-          "text_content", "attachment_uri", "attachment_name",
-          "attachment_type", "attachment_size", "attachment_hash",
-          "status", "direction", "timestamp", "is_read"
-        ),
+        null,
         "conversation_id = ?",
         arrayOf(conversationId),
         null, null, "timestamp ASC"
       ).use { cursor ->
+        val transportCol = cursor.getColumnIndex("transport_type")
+        val deliveryCol = cursor.getColumnIndex("verified_delivery_time")
+
         while (cursor.moveToNext()) {
-          val uri = cursor.getString(5)
+          val uri = if (cursor.isNull(5)) null else cursor.getString(5)
           val attachment = if (uri != null) {
             AttachmentMetadata(
               uri = uri,
@@ -241,6 +266,12 @@ class SqliteMessagingRepository(
               sha256Checksum = cursor.getString(9) ?: "",
             )
           } else null
+
+          val transportStr = if (transportCol >= 0 && !cursor.isNull(transportCol)) cursor.getString(transportCol) else null
+          val transportType = runCatching { MessageTransportType.valueOf(transportStr!!) }
+            .getOrDefault(MessageTransportType.DIRECT_P2P)
+
+          val verifiedTime = if (deliveryCol >= 0 && !cursor.isNull(deliveryCol)) cursor.getLong(deliveryCol) else null
 
           list.add(
             Message(
@@ -254,6 +285,8 @@ class SqliteMessagingRepository(
               direction = runCatching { MessageDirection.valueOf(cursor.getString(11)) }.getOrDefault(MessageDirection.OUTGOING),
               timestamp = cursor.getLong(12),
               isRead = cursor.getInt(13) == 1,
+              transportType = transportType,
+              verifiedDeliveryEpochMillis = verifiedTime,
             )
           )
         }

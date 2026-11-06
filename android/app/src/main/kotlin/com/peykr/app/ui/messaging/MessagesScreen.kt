@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -21,12 +22,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -58,8 +62,11 @@ import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.domain.messaging.Conversation
 import com.peykr.app.domain.messaging.Message
 import com.peykr.app.domain.messaging.MessageDirection
+import com.peykr.app.domain.messaging.MessageStatus
+import com.peykr.app.domain.messaging.MessageTransportType
 import com.peykr.app.domain.messaging.MessagingEngine
 import com.peykr.app.domain.messaging.MessagingRepository
+import com.peykr.app.domain.transport.TransportManager
 import com.peykr.app.ui.theme.AppHorizontalPadding
 import com.peykr.app.ui.theme.CardBorderColor
 import com.peykr.app.ui.theme.CardShadowColor
@@ -93,6 +100,7 @@ fun MessagesListScreen(
   val contacts by contactRepository.contacts.collectAsStateWithLifecycle(emptyList())
   val coroutineScope = rememberCoroutineScope()
   var showNewChatDialog by remember { mutableStateOf(false) }
+  var directRecipientName by remember { mutableStateOf("") }
   var searchQuery by remember { mutableStateOf("") }
   var selectedFilterIndex by remember { mutableStateOf(0) }
   val filters = listOf("Tümü", "Güvenilir Kişiler", "Doğrudan Cihazlar")
@@ -187,10 +195,10 @@ fun MessagesListScreen(
             Box(
               modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (isSelected) Color(0xFFEBF3FF) else Color.White)
+                .background(if (isSelected) PeykrTheme.colors.primarySubtle else PeykrTheme.colors.surface)
                 .border(
                   width = 1.dp,
-                  color = if (isSelected) Color(0xFFCCE0FF) else CardBorderColor,
+                  color = if (isSelected) PeykrTheme.colors.primaryAccent else PeykrTheme.colors.border,
                   shape = RoundedCornerShape(12.dp)
                 )
                 .clickable { selectedFilterIndex = index }
@@ -198,7 +206,7 @@ fun MessagesListScreen(
             ) {
               Text(
                 text = filter,
-                color = if (isSelected) Color(0xFF1E60D5) else Color(0xFF64748B),
+                color = if (isSelected) PeykrTheme.colors.primaryAccent else PeykrTheme.colors.textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 fontSize = 12.sp
@@ -325,66 +333,116 @@ fun MessagesListScreen(
         )
       },
       text = {
-        if (contacts.isEmpty()) {
-          Text(
-            text = "Eşleşmiş güvenilir kişi bulunamadı. Lütfen önce Kişiler sekmesinden yeni bir cihazla eşleşin.",
-            color = PeykrTheme.colors.textSecondary,
-            style = MaterialTheme.typography.bodyMedium
-          )
-        } else {
-          LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(contacts) { c ->
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .clip(RoundedCornerShape(14.dp))
-                  .background(Color(0xFFF8FAFC))
-                  .border(1.dp, CardBorderColor, RoundedCornerShape(14.dp))
-                  .clickable {
-                    coroutineScope.launch {
-                      val conv = messagingEngine.createOneToOneConversation(c)
-                      showNewChatDialog = false
-                      onOpenConversation(conv.id, conv.title)
-                    }
-                  }
-                  .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Box(
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          if (contacts.isNotEmpty()) {
+            Text(
+              text = "Güvenilir Kişiler",
+              color = PeykrTheme.colors.textPrimary,
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.Bold
+            )
+            LazyColumn(modifier = Modifier.heightIn(max = 160.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+              items(contacts) { c ->
+                Row(
                   modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                      Brush.linearGradient(
-                        listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
-                      )
-                    ),
-                  contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(PeykrTheme.colors.surfaceElevated)
+                    .border(1.dp, PeykrTheme.colors.border, RoundedCornerShape(14.dp))
+                    .clickable {
+                      coroutineScope.launch {
+                        val conv = messagingEngine.createOneToOneConversation(c)
+                        showNewChatDialog = false
+                        onOpenConversation(conv.id, conv.title)
+                      }
+                    }
+                    .padding(12.dp),
+                  verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Text(
-                    text = c.displayName.take(1).uppercase(),
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                  )
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                  Text(
-                    text = c.displayName,
-                    color = PeykrTheme.colors.textPrimary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                  )
-                  Text(
-                    text = "🔒 Uçtan uca şifreli doğrudan bağlantı",
-                    color = SuccessGreen,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 12.sp
-                  )
+                  Box(
+                    modifier = Modifier
+                      .size(40.dp)
+                      .clip(CircleShape)
+                      .background(
+                        Brush.linearGradient(
+                          listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
+                        )
+                      ),
+                    contentAlignment = Alignment.Center
+                  ) {
+                    Text(
+                      text = c.displayName.take(1).uppercase(),
+                      color = Color.White,
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 15.sp
+                    )
+                  }
+                  Spacer(Modifier.width(12.dp))
+                  Column(Modifier.weight(1f)) {
+                    Text(
+                      text = c.displayName,
+                      color = PeykrTheme.colors.textPrimary,
+                      style = MaterialTheme.typography.bodyMedium,
+                      fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                      text = "🔒 Uçtan uca şifreli",
+                      color = SuccessGreen,
+                      style = MaterialTheme.typography.labelSmall,
+                      fontSize = 11.sp
+                    )
+                  }
                 }
               }
             }
+            HorizontalDivider(color = PeykrTheme.colors.border)
+          }
+
+          Text(
+            text = "Doğrudan Cihaz veya Kişi",
+            color = PeykrTheme.colors.textPrimary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold
+          )
+          OutlinedTextField(
+            value = directRecipientName,
+            onValueChange = { directRecipientName = it },
+            placeholder = { Text("Kişi adı veya cihaz kimliği...", fontSize = 13.sp) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedBorderColor = PeykrTheme.colors.primaryAccent,
+              unfocusedBorderColor = PeykrTheme.colors.border
+            )
+          )
+          Button(
+            onClick = {
+              if (directRecipientName.isNotBlank()) {
+                val name = directRecipientName.trim()
+                directRecipientName = ""
+                showNewChatDialog = false
+                coroutineScope.launch {
+                  val convId = "conv_${java.util.UUID.randomUUID().toString().take(8)}"
+                  val newConv = Conversation(
+                    id = convId,
+                    title = name,
+                    isGroup = false,
+                    lastMessage = "🔒 Uçtan uca şifreli güvenli oturum başlatıldı",
+                    updatedAt = System.currentTimeMillis()
+                  )
+                  messagingRepository.saveConversation(newConv)
+                  onOpenConversation(newConv.id, newConv.title)
+                }
+              }
+            },
+            enabled = directRecipientName.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = PeykrTheme.colors.primaryAccent),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
+          ) {
+            Text("Sohbet Başlat", color = Color.White, fontWeight = FontWeight.Bold)
           }
         }
       },
@@ -394,7 +452,7 @@ fun MessagesListScreen(
           Text("Kapat", color = PeykrTheme.colors.primaryAccent)
         }
       },
-      containerColor = Color.White,
+      containerColor = PeykrTheme.colors.surface,
       shape = RoundedCornerShape(20.dp)
     )
   }
@@ -408,8 +466,8 @@ private fun ConversationRow(conversation: Conversation, onClick: () -> Unit) {
 
   PeykrCard(
     modifier = Modifier.fillMaxWidth(),
-    containerColor = Color.White,
-    borderColor = CardBorderColor,
+    containerColor = PeykrTheme.colors.surface,
+    borderColor = PeykrTheme.colors.border,
     shape = RoundedCornerShape(18.dp),
     elevation = 2.dp,
     contentPadding = PaddingValues(14.dp),
@@ -446,7 +504,7 @@ private fun ConversationRow(conversation: Conversation, onClick: () -> Unit) {
             .size(14.dp)
             .clip(CircleShape)
             .background(SuccessGreen)
-            .border(2.dp, Color.White, CircleShape)
+            .border(2.dp, PeykrTheme.colors.surface, CircleShape)
             .align(Alignment.BottomEnd)
         )
       }
@@ -534,15 +592,23 @@ fun ConversationDetailScreen(
   title: String,
   messagingRepository: MessagingRepository,
   messagingEngine: MessagingEngine,
+  transportManager: TransportManager? = null,
   onStartCall: (String, String) -> Unit,
   onBack: () -> Unit,
 ) {
   val messages by messagingRepository.getMessages(conversationId).collectAsStateWithLifecycle(emptyList())
   val coroutineScope = rememberCoroutineScope()
+  val listState = rememberLazyListState()
   var textInput by remember { mutableStateOf("") }
 
+  LaunchedEffect(messages.size) {
+    if (messages.isNotEmpty()) {
+      listState.animateScrollToItem(messages.size - 1)
+    }
+  }
+
   Scaffold(
-    containerColor = Color(0xFFF8FAFD),
+    containerColor = PeykrTheme.colors.background,
     contentWindowInsets = WindowInsets.safeDrawing,
     topBar = {
       // Modern elevated chat header
@@ -550,8 +616,8 @@ fun ConversationDetailScreen(
         modifier = Modifier
           .fillMaxWidth()
           .shadow(elevation = 3.dp, spotColor = CardShadowColor)
-          .background(Color.White)
-          .border(0.5.dp, Color(0xFFEEF2F6))
+          .background(PeykrTheme.colors.surface)
+          .border(0.5.dp, PeykrTheme.colors.border)
           .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -566,7 +632,7 @@ fun ConversationDetailScreen(
           PremiumIcon(
             kind = PremiumIconKind.Arrow,
             description = "Geri",
-            tint = Color(0xFF1E60D5),
+            tint = PeykrTheme.colors.primaryAccent,
             modifier = Modifier.size(20.dp)
           )
         }
@@ -598,7 +664,7 @@ fun ConversationDetailScreen(
               .size(11.dp)
               .clip(CircleShape)
               .background(SuccessGreen)
-              .border(2.dp, Color.White, CircleShape)
+              .border(2.dp, PeykrTheme.colors.surface, CircleShape)
               .align(Alignment.BottomEnd)
           )
         }
@@ -609,7 +675,7 @@ fun ConversationDetailScreen(
         Column(modifier = Modifier.weight(1f)) {
           Text(
             text = title,
-            color = Color(0xFF0F172A),
+            color = PeykrTheme.colors.textPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
@@ -638,14 +704,14 @@ fun ConversationDetailScreen(
           modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(Color(0xFFF1F5F9))
+            .background(PeykrTheme.colors.surfaceElevated)
             .clickable { onStartCall(conversationId.removePrefix("conv_"), title) },
           contentAlignment = Alignment.Center
         ) {
           PremiumIcon(
             kind = PremiumIconKind.Phone,
             description = "Sesli Ara",
-            tint = Color(0xFF1E60D5),
+            tint = PeykrTheme.colors.primaryAccent,
             modifier = Modifier.size(18.dp)
           )
         }
@@ -657,14 +723,14 @@ fun ConversationDetailScreen(
           modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(Color(0xFFF1F5F9))
+            .background(PeykrTheme.colors.surfaceElevated)
             .clickable { onStartCall(conversationId.removePrefix("conv_"), title) },
           contentAlignment = Alignment.Center
         ) {
           PremiumIcon(
             kind = PremiumIconKind.Video,
             description = "Görüntülü Ara",
-            tint = Color(0xFF1E60D5),
+            tint = PeykrTheme.colors.primaryAccent,
             modifier = Modifier.size(18.dp)
           )
         }
@@ -687,13 +753,13 @@ fun ConversationDetailScreen(
         Box(
           modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFEFF6FF))
-            .border(1.dp, Color(0xFFDBEAFE), RoundedCornerShape(12.dp))
+            .background(if (PeykrTheme.colors.isDark) Color(0xFF1E293B) else Color(0xFFEFF6FF))
+            .border(1.dp, if (PeykrTheme.colors.isDark) Color(0xFF334155) else Color(0xFFDBEAFE), RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
           Text(
             text = "🔒 Mesajlar ve aramalar cihazlar arasında uçtan uca şifrelidir.",
-            color = Color(0xFF1E40AF),
+            color = if (PeykrTheme.colors.isDark) Color(0xFF93C5FD) else Color(0xFF1E40AF),
             style = MaterialTheme.typography.labelSmall,
             fontSize = 11.sp,
             textAlign = TextAlign.Center
@@ -718,26 +784,26 @@ fun ConversationDetailScreen(
               modifier = Modifier
                 .size(60.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFEFF5FF)),
+                .background(PeykrTheme.colors.primarySubtle),
               contentAlignment = Alignment.Center
             ) {
               PremiumIcon(
                 kind = PremiumIconKind.Lock,
                 description = "Güvenli",
-                tint = Color(0xFF1E60D5),
+                tint = PeykrTheme.colors.primaryAccent,
                 modifier = Modifier.size(28.dp)
               )
             }
             Text(
               text = "Güvenli Sohbet Başlatıldı",
-              color = Color(0xFF0F172A),
+              color = PeykrTheme.colors.textPrimary,
               style = MaterialTheme.typography.titleMedium,
               fontWeight = FontWeight.Bold,
               fontSize = 17.sp
             )
             Text(
               text = "Mesajlarınız Double Ratchet protokolü ve AES-256 ile cihazlar arasında doğrudan iletilir.",
-              color = Color(0xFF64748B),
+              color = PeykrTheme.colors.textSecondary,
               style = MaterialTheme.typography.bodySmall,
               textAlign = TextAlign.Center,
               fontSize = 13.sp,
@@ -747,6 +813,7 @@ fun ConversationDetailScreen(
         }
       } else {
         LazyColumn(
+          state = listState,
           modifier = Modifier
             .weight(1f)
             .fillMaxWidth()
@@ -764,8 +831,8 @@ fun ConversationDetailScreen(
         modifier = Modifier
           .fillMaxWidth()
           .shadow(elevation = 6.dp, spotColor = CardShadowColor)
-          .background(Color.White)
-          .border(0.5.dp, Color(0xFFEEF2F6))
+          .background(PeykrTheme.colors.surface)
+          .border(0.5.dp, PeykrTheme.colors.border)
           .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -774,7 +841,7 @@ fun ConversationDetailScreen(
           modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(Color(0xFFF1F5F9))
+            .background(PeykrTheme.colors.surfaceElevated)
             .clickable {
               // Attachment action
             },
@@ -783,7 +850,7 @@ fun ConversationDetailScreen(
           PremiumIcon(
             kind = PremiumIconKind.Attachment,
             description = "Dosya Ekle",
-            tint = Color(0xFF64748B),
+            tint = PeykrTheme.colors.textSecondary,
             modifier = Modifier.size(18.dp)
           )
         }
@@ -794,18 +861,18 @@ fun ConversationDetailScreen(
         OutlinedTextField(
           value = textInput,
           onValueChange = { textInput = it },
-          placeholder = { Text("Bir mesaj yazın…", color = Color(0xFF94A3B8), fontSize = 14.sp) },
+          placeholder = { Text("Bir mesaj yazın…", color = PeykrTheme.colors.textMuted, fontSize = 14.sp) },
           modifier = Modifier.weight(1f),
           maxLines = 4,
           shape = RoundedCornerShape(24.dp),
           colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFFF8FAFC),
-            unfocusedContainerColor = Color(0xFFF8FAFC),
-            focusedBorderColor = Color(0xFF1E60D5),
-            unfocusedBorderColor = Color(0xFFE2E8F0),
-            cursorColor = Color(0xFF1E60D5),
-            focusedTextColor = Color(0xFF0F172A),
-            unfocusedTextColor = Color(0xFF0F172A)
+            focusedContainerColor = PeykrTheme.colors.surfaceElevated,
+            unfocusedContainerColor = PeykrTheme.colors.surfaceElevated,
+            focusedBorderColor = PeykrTheme.colors.primaryAccent,
+            unfocusedBorderColor = PeykrTheme.colors.border,
+            cursorColor = PeykrTheme.colors.primaryAccent,
+            focusedTextColor = PeykrTheme.colors.textPrimary,
+            unfocusedTextColor = PeykrTheme.colors.textPrimary
           )
         )
 
@@ -821,18 +888,26 @@ fun ConversationDetailScreen(
               if (textInput.isNotBlank()) {
                 Brush.horizontalGradient(listOf(Color(0xFF1E60D5), Color(0xFF1650B8)))
               } else {
-                Brush.horizontalGradient(listOf(Color(0xFFF1F5F9), Color(0xFFF1F5F9)))
+                Brush.horizontalGradient(listOf(PeykrTheme.colors.surfaceElevated, PeykrTheme.colors.surfaceElevated))
               }
             )
             .clickable(enabled = textInput.isNotBlank()) {
               val content = textInput
               textInput = ""
               coroutineScope.launch {
-                messagingEngine.sendTextMessage(
-                  conversationId = conversationId,
-                  recipientId = conversationId.removePrefix("conv_"),
-                  text = content,
-                )
+                if (transportManager != null) {
+                  transportManager.sendReliableMessage(
+                    conversationId = conversationId,
+                    recipientDeviceId = conversationId.removePrefix("conv_"),
+                    text = content,
+                  )
+                } else {
+                  messagingEngine.sendTextMessage(
+                    conversationId = conversationId,
+                    recipientId = conversationId.removePrefix("conv_"),
+                    text = content,
+                  )
+                }
               }
             },
           contentAlignment = Alignment.Center
@@ -840,7 +915,7 @@ fun ConversationDetailScreen(
           PremiumIcon(
             kind = PremiumIconKind.Send,
             description = "Gönder",
-            tint = if (textInput.isNotBlank()) Color.White else Color(0xFF94A3B8),
+            tint = if (textInput.isNotBlank()) Color.White else PeykrTheme.colors.textMuted,
             modifier = Modifier.size(18.dp)
           )
         }
@@ -875,11 +950,11 @@ private fun MessageBubble(message: Message) {
           if (isOutgoing) {
             Brush.horizontalGradient(listOf(Color(0xFF1E60D5), Color(0xFF1751B8)))
           } else {
-            Brush.horizontalGradient(listOf(Color.White, Color.White))
+            Brush.horizontalGradient(listOf(PeykrTheme.colors.surface, PeykrTheme.colors.surface))
           }
         )
         .then(
-          if (!isOutgoing) Modifier.border(1.dp, Color(0xFFEEF2F6), RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp))
+          if (!isOutgoing) Modifier.border(1.dp, PeykrTheme.colors.border, RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp))
           else Modifier
         )
         .padding(horizontal = 15.dp, vertical = 10.dp)
@@ -889,7 +964,7 @@ private fun MessageBubble(message: Message) {
       ) {
         Text(
           text = message.textContent ?: "[Dosya eki]",
-          color = if (isOutgoing) Color.White else Color(0xFF0F172A),
+          color = if (isOutgoing) Color.White else PeykrTheme.colors.textPrimary,
           style = MaterialTheme.typography.bodyMedium,
           fontSize = 15.sp,
           lineHeight = 20.sp
@@ -897,21 +972,57 @@ private fun MessageBubble(message: Message) {
         Spacer(Modifier.height(4.dp))
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(3.dp)
+          horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+          // Verified Transport indicator badge
+          val (transportLabel, transportBg) = when (message.transportType) {
+            MessageTransportType.LOCAL_WIFI -> Pair("Wi-Fi", Color(0xFF0D9488))
+            MessageTransportType.BLUETOOTH_MESH -> Pair("BLE Mesh", Color(0xFF4F46E5))
+            MessageTransportType.ONLINE_RELAY -> Pair("Şifreli Ağ", Color(0xFF2563EB))
+            MessageTransportType.OFFLINE_QUEUED -> Pair("Kuyrukta", Color(0xFFD97706))
+            MessageTransportType.DIRECT_P2P -> Pair("P2P", Color(0xFF0284C7))
+          }
+
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(4.dp))
+              .background(if (isOutgoing) Color.White.copy(alpha = 0.22f) else transportBg.copy(alpha = 0.12f))
+              .padding(horizontal = 4.dp, vertical = 1.dp)
+          ) {
+            Text(
+              text = transportLabel,
+              color = if (isOutgoing) Color.White else transportBg,
+              fontSize = 9.sp,
+              fontWeight = FontWeight.Bold
+            )
+          }
+
           Text(
             text = timeText,
-            color = if (isOutgoing) Color.White.copy(alpha = 0.8f) else Color(0xFF94A3B8),
+            color = if (isOutgoing) Color.White.copy(alpha = 0.8f) else PeykrTheme.colors.textMuted,
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.5.sp
           )
           if (isOutgoing) {
-            PremiumIcon(
-              kind = PremiumIconKind.CheckAll,
-              description = "İletildi",
-              tint = Color(0xFFBFDBFE),
-              modifier = Modifier.size(13.dp)
-            )
+            when (message.status) {
+              MessageStatus.DELIVERED, MessageStatus.READ -> {
+                PremiumIcon(
+                  kind = PremiumIconKind.CheckAll,
+                  description = "İletildi",
+                  tint = Color(0xFFBFDBFE),
+                  modifier = Modifier.size(13.dp)
+                )
+              }
+              MessageStatus.SENT -> {
+                Text("✓", color = Color(0xFFBFDBFE), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+              }
+              MessageStatus.QUEUED_OFFLINE -> {
+                Text("⏳", fontSize = 10.sp)
+              }
+              else -> {
+                Text("•", color = Color(0xFFBFDBFE), fontSize = 11.sp)
+              }
+            }
           }
         }
       }

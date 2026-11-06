@@ -273,6 +273,18 @@ data class PairingQrPayload(
     }
   }
 
+  fun computeOneTimeCode(): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    val bytes = (sessionId + initiatorDeviceId + initiatorNonceBase64).toByteArray(Charsets.UTF_8)
+    val digest = md.digest(bytes)
+    val value = ((digest[0].toInt() and 0x7F) shl 24) or
+      ((digest[1].toInt() and 0xFF) shl 16) or
+      ((digest[2].toInt() and 0xFF) shl 8) or
+      (digest[3].toInt() and 0xFF)
+    val num = Math.abs(value % 1_000_000)
+    return String.format(Locale.ROOT, "%03d %03d", num / 1000, num % 1000)
+  }
+
   companion object {
     const val CURRENT_VERSION = 1
     const val MAX_QR_PAYLOAD_LENGTH = 2048
@@ -550,6 +562,18 @@ data class PairingSession(
   val expiresAtEpochMillis: Long,
 ) {
   fun isExpired(nowMillis: Long = System.currentTimeMillis()): Boolean = nowMillis > expiresAtEpochMillis
+
+  fun computeOneTimeCode(): String {
+    val seed = sessionId + localDeviceId + localNonceBase64
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(seed.toByteArray(Charsets.UTF_8))
+    val value = ((digest[0].toInt() and 0x7F) shl 24) or
+      ((digest[1].toInt() and 0xFF) shl 16) or
+      ((digest[2].toInt() and 0xFF) shl 8) or
+      (digest[3].toInt() and 0xFF)
+    val num = Math.abs(value % 1_000_000)
+    return String.format(Locale.ROOT, "%03d %03d", num / 1000, num % 1000)
+  }
 }
 
 sealed class PairingException(message: String, cause: Throwable? = null) : Exception(message, cause) {

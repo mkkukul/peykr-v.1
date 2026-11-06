@@ -19,6 +19,11 @@ class DefaultSecurityGate(
     return pinManager?.isPinConfigured() == true
   }
 
+  override fun setupPin(pin: String): Result<Unit> {
+    val manager = pinManager ?: return Result.failure(SecurityGateException.PinNotConfigured())
+    return manager.setupPin(pin)
+  }
+
   override fun getRequiredAuthMethod(): RequiredAuthMethod {
     val bioAvailability = authenticator.checkAvailability(allowDeviceCredential = false)
     val pinConfigured = isPinConfigured()

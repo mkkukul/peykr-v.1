@@ -69,18 +69,24 @@ fun PeykrScreenContainer(
   modifier: Modifier = Modifier,
   content: @Composable BoxScope.() -> Unit
 ) {
+  val colors = PeykrTheme.colors
+  val gradient = if (colors.isDark) {
+    listOf(
+      Color(0xFF0F172A),
+      Color(0xFF090E17),
+      Color(0xFF05080E)
+    )
+  } else {
+    listOf(
+      AmbientBgTop,
+      Color(0xFFF6FAFE),
+      AmbientBgBottom
+    )
+  }
   Box(
     modifier = modifier
       .fillMaxSize()
-      .background(
-        Brush.verticalGradient(
-          listOf(
-            AmbientBgTop,
-            Color(0xFFF6FAFE),
-            AmbientBgBottom
-          )
-        )
-      ),
+      .background(Brush.verticalGradient(gradient)),
     content = content
   )
 }
@@ -92,8 +98,8 @@ fun PeykrScreenContainer(
 fun PeykrCard(
   modifier: Modifier = Modifier,
   onClick: (() -> Unit)? = null,
-  containerColor: Color = Color.White,
-  borderColor: Color = CardBorderColor,
+  containerColor: Color = PeykrTheme.colors.surface,
+  borderColor: Color = PeykrTheme.colors.border,
   shape: RoundedCornerShape = RoundedCornerShape(20.dp),
   elevation: Dp = 2.dp,
   contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -119,8 +125,8 @@ fun PeykrCard(
 fun PeykrGroupedCard(
   modifier: Modifier = Modifier,
   shape: RoundedCornerShape = RoundedCornerShape(20.dp),
-  containerColor: Color = Color.White,
-  borderColor: Color = CardBorderColor,
+  containerColor: Color = PeykrTheme.colors.surface,
+  borderColor: Color = PeykrTheme.colors.border,
   elevation: Dp = 2.dp,
   content: @Composable ColumnScope.() -> Unit
 ) {
@@ -195,7 +201,7 @@ fun PeykrGroupedRow(
           .fillMaxWidth()
           .padding(start = 72.dp)
           .height(1.dp)
-          .background(Color(0xFFF1F5F9))
+          .background(PeykrTheme.colors.border)
       )
     }
   }
@@ -210,8 +216,8 @@ fun PremiumSurface(
   PeykrCard(
     modifier = modifier,
     onClick = onClick,
-    containerColor = Color.White,
-    borderColor = CardBorderColor,
+    containerColor = PeykrTheme.colors.surface,
+    borderColor = PeykrTheme.colors.border,
     shape = GlassShape,
     content = content
   )
@@ -530,10 +536,10 @@ fun PeykrSearchField(
     singleLine = true,
     shape = RoundedCornerShape(16.dp),
     colors = OutlinedTextFieldDefaults.colors(
-      focusedContainerColor = Color.White,
-      unfocusedContainerColor = Color.White,
+      focusedContainerColor = PeykrTheme.colors.surface,
+      unfocusedContainerColor = PeykrTheme.colors.surface,
       focusedBorderColor = PeykrTheme.colors.primaryAccent,
-      unfocusedBorderColor = CardBorderColor,
+      unfocusedBorderColor = PeykrTheme.colors.border,
       cursorColor = PeykrTheme.colors.primaryAccent,
       focusedTextColor = PeykrTheme.colors.textPrimary,
       unfocusedTextColor = PeykrTheme.colors.textPrimary
@@ -557,8 +563,8 @@ fun PeykrBottomNavigationBar(
     modifier
       .fillMaxWidth()
       .shadow(elevation = 10.dp, spotColor = Color(0x180F172A), ambientColor = Color(0x100F172A))
-      .background(Color.White)
-      .border(0.5.dp, Color(0xFFF1F5F9))
+      .background(PeykrTheme.colors.surface)
+      .border(0.5.dp, PeykrTheme.colors.border)
       .navigationBarsPadding()
       .height(72.dp)
       .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -600,7 +606,7 @@ private fun BottomNavItem(
   onClick: () -> Unit
 ) {
   val activeColor = PeykrTheme.colors.primaryAccent
-  val inactiveColor = Color(0xFF94A3B8)
+  val inactiveColor = PeykrTheme.colors.textMuted
 
   Column(
     modifier = Modifier
@@ -616,14 +622,18 @@ private fun BottomNavItem(
         .clip(RoundedCornerShape(12.dp))
         .background(
           if (selected) {
-            Brush.horizontalGradient(listOf(Color(0xFFE8F1FF), Color(0xFFF0F6FF)))
+            if (PeykrTheme.colors.isDark) {
+              Brush.horizontalGradient(listOf(Color(0xFF1E293B), Color(0xFF283548)))
+            } else {
+              Brush.horizontalGradient(listOf(Color(0xFFE8F1FF), Color(0xFFF0F6FF)))
+            }
           } else {
             Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
           }
         )
         .border(
           width = if (selected) 1.dp else 0.dp,
-          color = if (selected) Color(0xFFDCEBFF) else Color.Transparent,
+          color = if (selected) (if (PeykrTheme.colors.isDark) Color(0xFF334155) else Color(0xFFDCEBFF)) else Color.Transparent,
           shape = RoundedCornerShape(12.dp)
         )
         .padding(horizontal = 14.dp, vertical = 5.dp),
