@@ -1,239 +1,223 @@
-# Peykr
+# PEYKR
 
-**Secure. Private. Device-to-Device Communication.**
+**Privacy-first, accountless communication for Android.**
 
-Peykr is an Android application focused on privacy, device identity, mutual trust, and secure communication foundations. It is designed around the principle that users should remain in control of their trusted devices and locally stored data.
+PEYKR is an Android communication application designed to connect people directly, with a strong focus on privacy, device identity, secure pairing and user-controlled data.
 
-[English](#english) | [Türkçe](#türkçe)
+The long-term vision is to combine secure messaging, decentralized communication, local network file sharing and emergency location sharing in one application.
 
----
+> **Development status:** PEYKR is actively under development. Some features are implemented as foundations or prototypes and still require real-world, multi-device verification.
 
-# English
+## Core Vision
 
-## About Peykr
-
-Peykr is a privacy-focused Android application that aims to establish a secure foundation for trusted device-to-device communication.
-
-The application combines device-bound cryptographic identity, encrypted local storage, biometric authorization, and QR-based mutual device pairing.
-
-Peykr follows a privacy-first approach: sensitive identity material and application data are designed to remain under local device control.
-
-## Key Features
-
-### Device Identity
-
-- Device-bound cryptographic identity.
-- P-256 ECDSA key pair generated and protected by Android Keystore.
-- Private identity key is never exported.
-- Public device identifier derived from the public key.
-
-### Encrypted Local Storage
-
-- SQLCipher-based encrypted database.
-- AES-256 database encryption.
-- Database encryption key protected through Android Keystore.
-- Encrypted database migration and local data protection.
-
-### Biometric Security
-
-- Android BiometricPrompt integration.
-- Support for strong biometrics and device credentials.
-- Scope-specific authorization tokens.
-- Single-use authorization and expiration controls.
-
-### Trusted Device Pairing
-
-- Camera-based QR code pairing.
-- Mutual device identity verification.
-- Four-step pairing confirmation protocol.
-- Device fingerprint verification.
-- Explicit user confirmation before establishing trust.
-- Pairing state validation and recovery handling.
-
-### Privacy-Focused Design
-
-- Local-first data architecture.
-- No mandatory phone number or email account.
-- No cloud account requirement in the current architecture.
-- Clear distinction between implemented functionality and planned capabilities.
+- No mandatory phone number or email registration.
+- Device-based identity.
+- QR code and PIN-based device pairing.
+- Private communication between trusted devices.
+- End-to-end encrypted messaging.
+- Offline message queuing.
+- Local network file sharing.
+- Bluetooth-based nearby communication.
+- Emergency location sharing.
+- Voice and video communication.
 
 ## Technology Stack
 
-| Technology              | Purpose                      |
-| ----------------------- | ---------------------------- |
-| Kotlin                  | Primary programming language |
-| Jetpack Compose         | Declarative UI               |
-| Material 3              | Design system                |
-| Android Keystore        | Cryptographic key protection |
-| SQLCipher               | Encrypted local database     |
-| SQLite                  | Local data storage           |
-| AndroidX Biometric      | Biometric authentication     |
-| CameraX                 | Camera integration           |
-| ML Kit Barcode Scanning | QR code detection            |
-| ZXing                   | QR code generation           |
-| Kotlin Coroutines       | Asynchronous operations      |
-| StateFlow               | Reactive application state   |
+| Component               | Technology                            |
+| ----------------------- | ------------------------------------- |
+| Platform                | Android                               |
+| Language                | Kotlin                                |
+| UI                      | Jetpack Compose                       |
+| Design system           | Material 3                            |
+| Navigation              | Navigation 3                          |
+| Local database          | SQLite / SQLCipher                    |
+| Cryptography            | Android Keystore, AES-GCM, ECDH, HKDF |
+| Device pairing          | QR code and PIN                       |
+| Local discovery         | Android NSD / mDNS                    |
+| Local networking        | HTTP-based local transport            |
+| Image and QR processing | CameraX, ML Kit, ZXing                |
 
-## Security Architecture
+## Architecture
 
-Peykr uses multiple security layers:
+PEYKR is organized around modular application layers:
 
-1. **Device Identity:** Each installation has a cryptographic identity protected by Android Keystore.
-2. **Local Encryption:** Application database content is encrypted using SQLCipher.
-3. **Key Protection:** The database encryption key is protected using an Android Keystore-backed AES-GCM key.
-4. **Biometric Authorization:** Sensitive operations can require explicit authorization through the security gate.
-5. **Mutual Pairing:** Devices exchange and verify cryptographic identity information through a QR-based handshake.
+- **Core:** Identity, cryptographic primitives and security.
+- **Domain:** Messaging, pairing, contacts, transport, file transfer and location.
+- **Data:** Local persistence and repositories.
+- **UI:** Jetpack Compose screens and application navigation.
 
-### Important Security Scope
+The architecture is intended to keep identity, security, communication and user-interface responsibilities separate.
 
-The current pairing implementation establishes mutual device identity verification and trust.
+## Features and Development Status
 
-It does not yet provide a complete end-to-end encrypted communication channel. ECDH-based key agreement, HKDF key derivation, and the complete messaging transport layer remain future development work.
+### 1. Device Identity and Pairing
 
-Peykr does not claim that all planned security capabilities are already implemented.
+- Device-based identity foundation.
+- QR-based pairing flow.
+- Inline PIN creation.
+- Temporary pairing codes.
+- Pairing approval and verification.
 
-## Project Structure
+<sub>Status: Implemented foundation; further security and physical-device verification required.</sub>
 
-The Android application is organised around a layered architecture:
+### 2. Secure Messaging
 
-```text
-peykr/
-├── android/
-│   ├── app/
-│   │   └── src/
-│   │       ├── main/
-│   │       │   ├── kotlin/com/peykr/app/
-│   │       │   │   ├── data/
-│   │       │   │   ├── domain/
-│   │       │   │   ├── security/
-│   │       │   │   └── ui/
-│   │       │   └── res/
-│   │       └── test/
-│   └── gradle/
-├── README.md
-└── ...
-```
+- Message composition and conversation interface.
+- Local message persistence.
+- Encryption and ratchet-session foundations.
+- Offline message queue.
+- Local network transport integration.
+- Delivery-state management.
 
-The exact module structure may evolve as development progresses.
+<sub>Status: Under active development. Reliable bidirectional communication between separate physical devices remains to be verified.</sub>
 
-## Requirements
+### 3. Local Network Communication
 
-- Windows, macOS, or Linux
+- Nearby device discovery using Android NSD/mDNS.
+- Local HTTP server and client.
+- Device authentication.
+- Transport management.
+
+<sub>Status: Implemented foundation; end-to-end delivery and reliability require multi-device testing.</sub>
+
+### 4. File Sharing
+
+Inspired by LocalSend's local network sharing approach.
+
+Planned capabilities include:
+
+- Nearby device discovery.
+- File selection and transfer.
+- Receiver approval.
+- Transfer progress.
+- File integrity verification.
+
+<sub>Status: Transfer foundations exist; complete real-device transfer verification is pending.</sub>
+
+### 5. Emergency Location Sharing
+
+- Android location permission handling.
+- Location acquisition.
+- Device identity-based signing.
+- Trusted recipient-based sharing.
+
+<sub>Status: Location acquisition and signing foundations exist. Successful delivery and recipient-side confirmation require physical-device testing.</sub>
+
+### 6. Bluetooth Mesh Communication
+
+Inspired by BitChat's decentralized communication approach.
+
+Planned capabilities:
+
+- BLE device discovery.
+- Nearby communication.
+- Offline message delivery.
+- Mesh packet routing.
+- Multi-device communication.
+
+<sub>Status: Development foundation and packet/queue components exist. Real BLE radio communication and multi-device mesh routing are not yet verified.</sub>
+
+### 7. Voice and Video Calling
+
+Planned capabilities:
+
+- Voice calls.
+- Video calls.
+- Secure call signalling.
+- Peer-to-peer media communication.
+
+<sub>Status: Signalling models and UI foundations exist. Real WebRTC audio/video communication is not implemented.</sub>
+
+## Installation
+
+Download or build the Android debug APK.
+
+Current application ID:
+
+`com.peykr.app`
+
+## Development Setup
+
+Requirements:
+
 - Android Studio
-- JDK compatible with the project Gradle configuration
 - Android SDK
+- JDK compatible with the project Gradle configuration
 - Git
-
-## Getting Started
 
 Clone the repository:
 
 ```bash
 git clone https://github.com/mkkukul/peykr-v.1.git
-```
-
-Open the Android project:
-
-```text
-peykr/android
+cd peykr-v.1/android
 ```
 
 Build the debug APK:
 
 ```bash
-cd android
-./gradlew assembleDebug
-```
-
-On Windows:
-
-```powershell
-cd android
-.\gradlew.bat assembleDebug
+gradlew.bat assembleDebug
 ```
 
 Run unit tests:
 
 ```bash
-./gradlew testDebugUnitTest
+gradlew.bat testDebugUnitTest
 ```
 
-Compile Android instrumentation tests:
-
-```bash
-./gradlew compileDebugAndroidTestKotlin
-```
-
-The debug APK is generated at:
+APK output:
 
 ```text
-android/app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Development Status
+## Testing
 
-Peykr is under active development.
+PEYKR uses unit tests to validate application components.
 
-| Component                        | Status           |
-| -------------------------------- | ---------------- |
-| Android application foundation   | Implemented      |
-| Premium UI and branding          | Implemented      |
-| Device cryptographic identity    | Implemented      |
-| Encrypted local database         | Implemented      |
-| Biometric authorization gate     | Implemented      |
-| QR-based mutual device pairing   | Implemented      |
-| Pairing security hardening       | Implemented      |
-| Camera scanner integration       | Implemented      |
-| Complete E2EE communication      | Planned          |
-| ECDH and HKDF key agreement      | Planned          |
-| Peer-to-peer messaging transport | Planned          |
-| Real-time location sharing       | Planned          |
-| iOS application                  | Future direction |
+Important real-world tests still required include:
 
-Implementation status does not imply that every feature has been independently verified on physical devices.
+- Pairing between two physical Android devices.
+- Bidirectional encrypted messaging.
+- Offline queue delivery after reconnection.
+- Local network file transfer.
+- Emergency location delivery.
+- BLE discovery and communication.
+- WebRTC calling.
 
-## Privacy Principles
+Passing unit tests does not automatically establish successful communication between physical devices.
 
-Peykr is being developed around the following principles:
+## Privacy and Security Principles
 
-- Privacy by design.
-- Local-first data ownership.
-- Minimal collection of personal information.
-- Cryptographic device identity.
-- Explicit mutual trust.
-- Transparent security boundaries.
+PEYKR is designed around the following principles:
 
-## Contributing
+- No unnecessary account registration.
+- Device-based identity.
+- Explicit trusted-device pairing.
+- Encryption of private communications.
+- Local-first data handling.
+- User-controlled location sharing.
+- Authentication of incoming communication.
+- No silent plaintext fallback.
 
-Contributions, suggestions, and security feedback are welcome.
+The cryptographic implementation and security architecture are still undergoing development and verification. PEYKR should not yet be considered a fully audited production-grade secure messenger.
 
-Before submitting major changes, please open an issue to discuss the proposed implementation.
+## Roadmap
 
-## Security Issues
+- [ ] Complete reliable two-device pairing.
+- [ ] Verify bidirectional end-to-end encrypted messaging.
+- [ ] Complete offline message queue and delivery acknowledgements.
+- [ ] Complete local network file transfer.
+- [ ] Complete emergency location delivery.
+- [ ] Implement and verify BLE device communication.
+- [ ] Implement Bluetooth mesh routing.
+- [ ] Integrate real WebRTC voice and video calls.
+- [ ] Complete independent security review.
+- [ ] Prepare production release.
 
-Please do not publicly disclose exploitable security vulnerabilities before responsible coordination.
+## Project Philosophy
 
-Report security concerns privately to the project maintainer.
+PEYKR aims to give users control over their communication and personal data.
 
-## License
+The goal is not simply to build another messaging application, but to create a privacy-first communication platform that can operate across internet, local network and nearby-device communication methods.
 
-The project's licence has not yet been specified.
-
----
-
-# Türkçe
-
-## Peykr Hakkında
-
-Peykr, gizlilik odaklı cihazlar arası iletişim için güvenli bir temel oluşturmayı amaçlayan bir Android uygulamasıdır.
-
-Uygulama; cihaza bağlı kriptografik kimlik, şifreli yerel depolama, biyometrik yetkilendirme ve QR kod tabanlı karşılıklı cihaz eşleştirme özelliklerini bir araya getirir.
-
-Peykr'nin temel yaklaşımı, hassas kimlik bilgilerinin ve uygulama verilerinin kontrolünü kullanıcının kendi cihazında tutmaktır.
-
-## Temel Özellikler
-
-### Cihaz Kimliği
-
-- Cihaza bağlı kriptografik kimlik.
-- Android Keystore tarafından korunan P-256 ECDSA anahtar ç
+**One identity. Trusted devices. Private communication.**
