@@ -97,6 +97,7 @@ class PeykrApplication : Application(), AppContainer {
     MessagingEngine(
       deviceIdentity = deviceIdentity,
       messagingRepository = messagingRepository,
+      ratchetStore = com.peykr.app.core.security.FileRatchetStore(File(filesDir, "security/ratchets")),
     )
   }
 
@@ -137,6 +138,9 @@ class PeykrApplication : Application(), AppContainer {
       fileTransferEngine = fileTransferEngine,
       messagingEngine = messagingEngine,
       contactRepository = contactRepository,
+      deviceIdentity = deviceIdentity,
+      localNetworkDiscovery = localNetworkDiscovery,
+      messagingRepository = messagingRepository,
       onDirectMessageReceived = { msg ->
         CoroutineScope(Dispatchers.IO).launch {
           val senderId = msg.senderId
@@ -178,7 +182,7 @@ class PeykrApplication : Application(), AppContainer {
       context = this,
       localDeviceId = id,
       localDisplayName = "Peykr Cihazı",
-      localPort = localHttpServer.boundPort,
+      localPort = LocalHttpServer.DEFAULT_PORT,
       localFingerprint = fp,
     )
   }

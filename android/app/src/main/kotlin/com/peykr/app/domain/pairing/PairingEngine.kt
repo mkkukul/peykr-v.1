@@ -53,5 +53,9 @@ interface PairingEngine {
     confirmation: PairingConfirmation,
   ): Result<PairingSession>
 
+  suspend fun completeDirectPairing(
+    remoteIdentity: RemoteDeviceIdentity,
+  ): Result<com.peykr.app.domain.contacts.TrustedContact>
+
   suspend fun cancelSession(session: PairingSession): Result<PairingSession>
 }

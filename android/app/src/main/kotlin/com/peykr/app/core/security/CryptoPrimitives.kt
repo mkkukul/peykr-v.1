@@ -112,4 +112,34 @@ object CryptoPrimitives {
     val prk = hkdfExtract(salt, ikm)
     return hkdfExpand(prk, info, length)
   }
+
+  fun signData(privateKey: PrivateKey, data: ByteArray): ByteArray {
+    val signer = java.security.Signature.getInstance("SHA256withECDSA")
+    signer.initSign(privateKey)
+    signer.update(data)
+    return signer.sign()
+  }
+
+  fun verifySignature(publicKey: PublicKey, data: ByteArray, signature: ByteArray): Boolean {
+    return try {
+      val verifier = java.security.Signature.getInstance("SHA256withECDSA")
+      verifier.initVerify(publicKey)
+      verifier.update(data)
+      verifier.verify(signature)
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
+  fun verifySignature(publicKeyBase64: String, data: ByteArray, signature: ByteArray): Boolean {
+    return try {
+      val decoded = java.util.Base64.getDecoder().decode(publicKeyBase64)
+      val keySpec = X509EncodedKeySpec(decoded)
+      val keyFactory = java.security.KeyFactory.getInstance("EC")
+      val pubKey = keyFactory.generatePublic(keySpec)
+      verifySignature(pubKey, data, signature)
+    } catch (_: Throwable) {
+      false
+    }
+  }
 }

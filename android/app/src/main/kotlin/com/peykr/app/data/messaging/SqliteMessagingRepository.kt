@@ -166,6 +166,48 @@ class SqliteMessagingRepository(
     }
   }
 
+  override suspend fun getMessageById(messageId: String): Message? = withContext(Dispatchers.IO) {
+    try {
+      val db = getDatabase()
+      db.query("messages", null, "id = ?", arrayOf(messageId), null, null, null).use { cursor ->
+        if (cursor.moveToFirst()) {
+          val uri = if (cursor.isNull(5)) null else cursor.getString(5)
+          val attachment = if (uri != null) {
+            AttachmentMetadata(
+              uri = uri,
+              fileName = cursor.getString(6) ?: "attachment",
+              mimeType = cursor.getString(7) ?: "application/octet-stream",
+              sizeBytes = cursor.getLong(8),
+              sha256Checksum = cursor.getString(9) ?: "",
+            )
+          } else null
+          val transportCol = cursor.getColumnIndex("transport_type")
+          val deliveryCol = cursor.getColumnIndex("verified_delivery_time")
+          val transportStr = if (transportCol >= 0 && !cursor.isNull(transportCol)) cursor.getString(transportCol) else null
+          val transportType = runCatching { MessageTransportType.valueOf(transportStr!!) }.getOrDefault(MessageTransportType.DIRECT_P2P)
+          val verifiedTime = if (deliveryCol >= 0 && !cursor.isNull(deliveryCol)) cursor.getLong(deliveryCol) else null
+
+          Message(
+            id = cursor.getString(0),
+            conversationId = cursor.getString(1),
+            senderId = cursor.getString(2),
+            recipientId = cursor.getString(3),
+            textContent = cursor.getString(4),
+            attachment = attachment,
+            status = runCatching { MessageStatus.valueOf(cursor.getString(10)) }.getOrDefault(MessageStatus.SENT),
+            direction = runCatching { MessageDirection.valueOf(cursor.getString(11)) }.getOrDefault(MessageDirection.OUTGOING),
+            timestamp = cursor.getLong(12),
+            isRead = cursor.getInt(13) == 1,
+            transportType = transportType,
+            verifiedDeliveryEpochMillis = verifiedTime,
+          )
+        } else null
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
   override suspend fun getGroupMembers(conversationId: String): List<GroupMember> = withContext(Dispatchers.IO) {
     val db = getDatabase()
     val members = mutableListOf<GroupMember>()

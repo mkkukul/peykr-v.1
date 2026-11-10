@@ -1,18 +1,22 @@
 package com.peykr.app.domain.localsend
 
 import android.util.Log
+import com.peykr.app.core.identity.DeviceIdentity
+import com.peykr.app.core.identity.getOrNull
 import com.peykr.app.core.security.EncryptedRatchetMessage
 import com.peykr.app.core.security.RatchetHeader
 import com.peykr.app.domain.contacts.PairingStatus
 import com.peykr.app.domain.contacts.TrustedContactRepository
 import com.peykr.app.domain.messaging.Message
 import com.peykr.app.domain.messaging.MessagingEngine
+import com.peykr.app.domain.messaging.MessagingRepository
 import com.peykr.app.domain.transfer.FileTransferEngine
 import com.peykr.app.domain.transfer.TransferFileItem
 import com.peykr.app.domain.transfer.TransferProposal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -35,9 +39,15 @@ class LocalHttpServer(
   private val fileTransferEngine: FileTransferEngine,
   private val messagingEngine: MessagingEngine? = null,
   private val contactRepository: TrustedContactRepository? = null,
+  private val deviceIdentity: DeviceIdentity? = null,
   private val onDirectMessageReceived: ((Message) -> Unit)? = null,
+  var onPairingCompleted: ((com.peykr.app.domain.contacts.TrustedContact) -> Unit)? = null,
+  private val localNetworkDiscovery: LocalNetworkDiscovery? = null,
+  private val messagingRepository: MessagingRepository? = null,
   private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO),
 ) {
+
+  var activeQrPayload: com.peykr.app.domain.pairing.PairingQrPayload? = null
 
   private var serverSocket: ServerSocket? = null
   private var serverJob: Job? = null
@@ -51,10 +61,10 @@ class LocalHttpServer(
     var bound = false
     while (!bound && candidatePort < port + 50) {
       try {
-        serverSocket = ServerSocket(candidatePort)
+        serverSocket = ServerSocket(candidatePort, 50, java.net.InetAddress.getByName("0.0.0.0"))
         boundPort = candidatePort
         bound = true
-        Log.i(TAG, "Peykr Local HTTP server bound to port $boundPort")
+        Log.i(TAG, "Peykr Local HTTP server bound to port $boundPort on 0.0.0.0")
       } catch (e: Exception) {
         candidatePort++
       }
@@ -124,6 +134,15 @@ class LocalHttpServer(
             sendJsonResponse(outputStream, 200, json.toString())
           }
 
+          method == "GET" && path == "/api/peykr/v1/pair/qr" -> {
+            val qr = activeQrPayload
+            if (qr != null) {
+              sendJsonResponse(outputStream, 200, qr.serialize())
+            } else {
+              sendJsonResponse(outputStream, 404, """{"error":"No active pairing QR available"}""")
+            }
+          }
+
           method == "POST" && path == "/api/peykr/v1/transfer/prepare" -> {
             val body = readBodyString(inputStream, contentLength)
             val json = JSONObject(body)
@@ -167,6 +186,78 @@ class LocalHttpServer(
             sendJsonResponse(outputStream, if (verified) 200 else 400, responseJson.toString())
           }
 
+          method == "POST" && path == "/api/peykr/v1/pair/exchange" -> {
+            val body = readBodyString(inputStream, contentLength)
+            val json = JSONObject(body)
+            val responderId = json.optString("id").ifEmpty { json.optString("responderDeviceId", "") }
+            val responderPk = json.optString("pk").ifEmpty { json.optString("responderPublicKeyBase64", "") }
+            val responderName = json.optString("name").ifEmpty { json.optString("responderDisplayName", "Peykr Cihazı") }
+            val responderSig = json.optString("sig").ifEmpty { json.optString("responderSignatureBase64", "") }
+            val responderNonce = json.optString("nonce").ifEmpty { json.optString("responderNonceBase64", "") }
+
+            val remoteIdentity = com.peykr.app.domain.pairing.RemoteDeviceIdentity(
+              deviceId = responderId,
+              publicKeyBase64 = responderPk,
+              displayName = responderName
+            )
+            if (!remoteIdentity.verifyDeviceId()) {
+              Log.w(TAG, "Rejected pairing exchange: public key digest mismatch for $responderId")
+              sendJsonResponse(outputStream, 400, """{"error":"Public key digest mismatch"}""")
+              return
+            }
+
+            // Save contact as PAIRED directly upon verified exchange
+            val repo = contactRepository
+            if (repo != null) {
+              val contact = com.peykr.app.domain.contacts.TrustedContact(
+                id = responderId,
+                displayName = responderName,
+                publicIdentity = responderPk,
+                pairingStatus = PairingStatus.PAIRED,
+                createdAtEpochMillis = System.currentTimeMillis()
+              )
+              val existing = repo.getById(responderId)
+              if (existing == null) {
+                repo.add(contact)
+              } else {
+                repo.update(contact)
+              }
+              onPairingCompleted?.invoke(contact)
+              Log.i(TAG, "Successfully paired with device over LAN: $responderName ($responderId)")
+            }
+
+            val responderIp = json.optString("ip").ifEmpty { socket.inetAddress?.hostAddress }
+            val responderPort = json.optInt("port", 53317)
+            if (!responderIp.isNullOrBlank()) {
+              localNetworkDiscovery?.addVirtualDiscoveredDevice(
+                com.peykr.app.domain.transfer.DiscoveredDevice(
+                  deviceId = responderId,
+                  displayName = responderName,
+                  deviceModel = "Android",
+                  ipAddress = responderIp,
+                  port = responderPort,
+                  fingerprint = responderPk,
+                  lastSeenEpochMillis = System.currentTimeMillis()
+                )
+              )
+              localNetworkDiscovery?.cachePeerAddress(responderId, responderIp, responderPort)
+            }
+
+            // Sign initiator approval
+            val approvalTranscript = "$responderNonce:$localDeviceId:APPROVED".toByteArray(StandardCharsets.UTF_8)
+            val approvalSigBytes = deviceIdentity?.sign(approvalTranscript)?.getOrNull()
+            val approvalSigB64 = approvalSigBytes?.let { java.util.Base64.getEncoder().encodeToString(it) } ?: ""
+
+            val respJson = JSONObject().apply {
+              put("status", "PAIRED")
+              put("initiatorDeviceId", localDeviceId)
+              put("initiatorPublicKeyBase64", localFingerprint)
+              put("initiatorDisplayName", localDisplayName)
+              put("signature", approvalSigB64)
+            }
+            sendJsonResponse(outputStream, 200, respJson.toString())
+          }
+
           method == "POST" && path == "/api/peykr/v1/message/direct" -> {
             val body = readBodyString(inputStream, contentLength)
             val json = JSONObject(body)
@@ -174,11 +265,48 @@ class LocalHttpServer(
             val recipientId = json.optString("recipientId", "")
 
             // 1. Authenticate sender: sender must be in contact repository and PAIRED
-            if (contactRepository != null) {
-              val contact = contactRepository.getById(senderId)
-              if (contact == null || contact.pairingStatus != PairingStatus.PAIRED) {
-                Log.w(TAG, "Rejected message from unauthenticated/unpaired device: $senderId")
-                sendJsonResponse(outputStream, 403, """{"error":"Forbidden: sender is not an authenticated paired contact"}""")
+            val repo = contactRepository
+            val matchedContact = if (repo != null) {
+              val direct = repo.getById(senderId)
+              if (direct != null && direct.pairingStatus == PairingStatus.PAIRED) {
+                direct
+              } else {
+                runCatching {
+                  val all = repo.contacts.first()
+                  all.firstOrNull { c ->
+                    (c.id.equals(senderId, ignoreCase = true) || c.publicIdentity == senderId) &&
+                      c.pairingStatus == PairingStatus.PAIRED
+                  }
+                }.getOrNull()
+              }
+            } else null
+
+            if (repo != null && matchedContact == null) {
+              Log.w(TAG, "Rejected message from unauthenticated/unpaired device: $senderId")
+              sendJsonResponse(outputStream, 403, """{"error":"Forbidden: sender is not an authenticated paired contact"}""")
+              return
+            }
+
+            val resolvedSenderId = matchedContact?.id ?: senderId
+
+            // 1.5 Idempotency check: if message with this ID was already received and persisted,
+            // return DELIVERED ACK immediately without running the ratchet decryption step (avoids replay error)
+            val wireMessageId = json.optString("id").ifEmpty { null }
+            if (wireMessageId != null && messagingRepository != null) {
+              val existing = messagingRepository.getMessageById(wireMessageId)
+              if (existing != null) {
+                val ackTimestamp = System.currentTimeMillis()
+                val ackPayload = "${existing.id}:DELIVERED:$ackTimestamp"
+                val sigBytes = deviceIdentity?.sign(ackPayload.toByteArray(StandardCharsets.UTF_8))?.getOrNull()
+                val sigB64 = sigBytes?.let { java.util.Base64.getEncoder().encodeToString(it) } ?: ""
+
+                val responseJson = JSONObject().apply {
+                  put("status", "DELIVERED")
+                  put("messageId", existing.id)
+                  put("ackPayload", ackPayload)
+                  put("ackSignature", sigB64)
+                }
+                sendJsonResponse(outputStream, 200, responseJson.toString())
                 return
               }
             }
@@ -186,7 +314,7 @@ class LocalHttpServer(
             // 2. Reject cleartext: end-to-end encryption is strictly required
             val hasEncrypted = json.has("encryptedPayload") && !json.isNull("encryptedPayload")
             if (!hasEncrypted) {
-              Log.w(TAG, "Rejected plaintext message from sender: $senderId. Cleartext transport is forbidden.")
+              Log.w(TAG, "Rejected plaintext message from sender: $resolvedSenderId. Cleartext transport is forbidden.")
               sendJsonResponse(outputStream, 400, """{"error":"Bad Request: plaintext transport is forbidden; encryptedPayload required"}""")
               return
             }
@@ -203,18 +331,19 @@ class LocalHttpServer(
               ciphertextWithTagBase64 = encJson.getString("ciphertextWithTag"),
             )
 
-            val senderPubKey = contactRepository?.getById(senderId)?.publicIdentity ?: encJson.getString("senderDhPublicKey")
+            val senderPubKey = matchedContact?.publicIdentity ?: encJson.getString("senderDhPublicKey")
             var decryptedMsg: Message? = null
             if (messagingEngine != null) {
               val decryptResult = messagingEngine.receiveEncryptedTextMessage(
-                conversationId = "conv_$senderId",
-                senderId = senderId,
+                conversationId = "conv_$resolvedSenderId",
+                senderId = resolvedSenderId,
                 encryptedMessage = encMsg,
-                senderPublicKeyBase64 = senderPubKey
+                senderPublicKeyBase64 = senderPubKey,
+                messageId = wireMessageId,
               )
               if (decryptResult.isFailure) {
                 val err = decryptResult.exceptionOrNull()?.message ?: "Cryptographic mismatch"
-                Log.e(TAG, "Decryption failed for direct message from $senderId: $err")
+                Log.e(TAG, "Decryption failed for direct message from $resolvedSenderId: $err")
                 sendJsonResponse(outputStream, 400, """{"error":"Decryption failed: cryptographic integrity check failed ($err)"}""")
                 return
               }
@@ -223,7 +352,34 @@ class LocalHttpServer(
 
             if (decryptedMsg != null) {
               onDirectMessageReceived?.invoke(decryptedMsg)
-              sendJsonResponse(outputStream, 200, """{"status":"DELIVERED","messageId":"${decryptedMsg.id}"}""")
+              val clientIp = socket.inetAddress?.hostAddress
+              if (!clientIp.isNullOrBlank()) {
+                localNetworkDiscovery?.addVirtualDiscoveredDevice(
+                  com.peykr.app.domain.transfer.DiscoveredDevice(
+                    deviceId = resolvedSenderId,
+                    displayName = matchedContact?.displayName ?: "Peykr Cihazı",
+                    deviceModel = "Android",
+                    ipAddress = clientIp,
+                    port = 53317,
+                    fingerprint = senderPubKey,
+                    lastSeenEpochMillis = System.currentTimeMillis()
+                  )
+                )
+                localNetworkDiscovery?.cachePeerAddress(resolvedSenderId, clientIp, 53317)
+              }
+
+              val ackTimestamp = System.currentTimeMillis()
+              val ackPayload = "${decryptedMsg.id}:DELIVERED:$ackTimestamp"
+              val sigBytes = deviceIdentity?.sign(ackPayload.toByteArray(StandardCharsets.UTF_8))?.getOrNull()
+              val sigB64 = sigBytes?.let { java.util.Base64.getEncoder().encodeToString(it) } ?: ""
+
+              val responseJson = JSONObject().apply {
+                put("status", "DELIVERED")
+                put("messageId", decryptedMsg.id)
+                put("ackPayload", ackPayload)
+                put("ackSignature", sigB64)
+              }
+              sendJsonResponse(outputStream, 200, responseJson.toString())
             } else {
               sendJsonResponse(outputStream, 500, """{"error":"Messaging engine not initialized"}""")
             }

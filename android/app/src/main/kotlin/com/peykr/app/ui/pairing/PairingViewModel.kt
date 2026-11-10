@@ -10,8 +10,14 @@ import com.peykr.app.core.auth.SecurityGate
 import com.peykr.app.core.auth.SecurityGateScope
 import com.peykr.app.core.identity.DeviceIdentity
 import com.peykr.app.core.identity.getOrNull
+import com.peykr.app.core.network.NetworkUtils
+import com.peykr.app.domain.contacts.TrustedContactRepository
+import com.peykr.app.domain.localsend.LocalHttpClient
+import com.peykr.app.domain.localsend.LocalHttpServer
+import com.peykr.app.domain.localsend.LocalNetworkDiscovery
 import com.peykr.app.domain.pairing.PairingConfirmation
 import com.peykr.app.domain.pairing.PairingEngine
+import com.peykr.app.domain.pairing.PairingExchangePayload
 import com.peykr.app.domain.pairing.PairingQrPayload
 import com.peykr.app.domain.pairing.PairingRequest
 import com.peykr.app.domain.pairing.PairingResponse
@@ -20,6 +26,7 @@ import com.peykr.app.domain.pairing.PairingSession
 import com.peykr.app.domain.pairing.PairingSessionState
 import com.peykr.app.domain.pairing.QrMessageClassifier
 import com.peykr.app.domain.pairing.QrMessageType
+import com.peykr.app.domain.pairing.RemoteDeviceIdentity
 import com.peykr.app.ui.pairing.qr.QrCodeGenerator
 import com.peykr.app.ui.pairing.qr.QrMatrix
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +34,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
+import java.util.Base64
 
 sealed interface PairingUiState {
   data object RoleSelection : PairingUiState
@@ -120,8 +130,31 @@ class PairingViewModel(
   private val pairingEngine: PairingEngine,
   private val securityGate: SecurityGate,
   private val deviceIdentity: DeviceIdentity? = null,
+  private val localHttpClient: LocalHttpClient? = null,
+  private val contactRepository: TrustedContactRepository? = null,
+  private val localHttpServer: LocalHttpServer? = null,
+  private val localNetworkDiscovery: LocalNetworkDiscovery? = null,
   coroutineScope: CoroutineScope? = null,
 ) : ViewModel() {
+
+  init {
+    localHttpServer?.let { server ->
+      val previousCallback = server.onPairingCompleted
+      server.onPairingCompleted = { contact ->
+        previousCallback?.invoke(contact)
+        scope.launch {
+          val curr = _uiState.value
+          if (curr is PairingUiState.InitiatorShowInitialQr || curr is PairingUiState.InitiatorScanRequest) {
+            _uiState.value = PairingUiState.Success(
+              role = PairingRole.INITIATOR,
+              remoteName = contact.displayName,
+              remoteFingerprint = formatFingerprint(contact.id),
+            )
+          }
+        }
+      }
+    }
+  }
 
   private val scope: CoroutineScope = coroutineScope ?: viewModelScope
 
@@ -148,6 +181,8 @@ class PairingViewModel(
         _uiState.value = PairingUiState.Error("Failed to generate QR payload: ${error.message}")
         return@launch
       }
+
+      localHttpServer?.activeQrPayload = qrPayload
 
       val serialized = qrPayload.serialize()
       val matrixResult = QrCodeGenerator.generateQrMatrix(serialized)
@@ -240,41 +275,33 @@ class PairingViewModel(
   fun approveInitiatorRequest() {
     val session = activeSession ?: return
     val current = _uiState.value as? PairingUiState.InitiatorReviewAndApprove ?: return
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
 
-    when (securityGate.getRequiredAuthMethod()) {
-      RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
-        _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
-      }
-      RequiredAuthMethod.PIN_REQUIRED -> {
-        _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
-      }
-      RequiredAuthMethod.BIOMETRIC_OR_PIN -> {
-        _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
-        scope.launch {
-          val promptConfig = AuthPromptConfig(
-            title = "Approve Device Pairing",
-            description = "Authenticate to confirm pairing with ${current.remoteName}",
-          )
-          val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
-          val token = authResult.getOrElse { error ->
-            if (securityGate.isPinConfigured()) {
-              _uiState.value = current.copy(
-                isAuthenticating = false,
-                showPinDialog = true,
-                errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
-              )
-            } else {
-              _uiState.value = current.copy(
-                isAuthenticating = false,
-                showSetupPinDialog = true,
-                errorMessage = null,
-              )
-            }
-            return@launch
+    scope.launch {
+      val tokenResult = securityGate.authorizeDirect(SecurityGateScope.APPROVE_TRUSTED_DEVICE)
+      val token = tokenResult.getOrElse {
+        val promptConfig = AuthPromptConfig(
+          title = "Approve Device Pairing",
+          description = "Authenticate to confirm pairing with ${current.remoteName}",
+        )
+        securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig).getOrElse { error ->
+          if (securityGate.isPinConfigured()) {
+            _uiState.value = current.copy(
+              isAuthenticating = false,
+              showPinDialog = true,
+              errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
+            )
+          } else {
+            _uiState.value = current.copy(
+              isAuthenticating = false,
+              showSetupPinDialog = true,
+              errorMessage = null,
+            )
           }
-          executeInitiatorApproval(session, current, token)
+          return@launch
         }
       }
+      executeInitiatorApproval(session, current, token)
     }
   }
 
@@ -467,41 +494,88 @@ class PairingViewModel(
 
   fun approveResponderRequest(responderDisplayName: String = defaultDeviceName) {
     val current = _uiState.value as? PairingUiState.ResponderReviewAndApprove ?: return
+    _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
 
-    when (securityGate.getRequiredAuthMethod()) {
-      RequiredAuthMethod.SETUP_PIN_REQUIRED -> {
-        _uiState.value = current.copy(showSetupPinDialog = true, errorMessage = null)
-      }
-      RequiredAuthMethod.PIN_REQUIRED -> {
-        _uiState.value = current.copy(showPinDialog = true, errorMessage = null)
-      }
-      RequiredAuthMethod.BIOMETRIC_OR_PIN -> {
-        _uiState.value = current.copy(isAuthenticating = true, errorMessage = null)
-        scope.launch {
-          val promptConfig = AuthPromptConfig(
-            title = "Approve Device Pairing",
-            description = "Authenticate to request pairing with ${current.remoteName}",
+    scope.launch {
+      // 1. First attempt: Direct network pairing if remote IP/port and localHttpClient are available
+      val targetIp = current.payload.initiatorIp
+      val targetPort = current.payload.initiatorPort
+      if (!targetIp.isNullOrBlank() && targetPort > 0 && localHttpClient != null) {
+        val identity = deviceIdentity?.getOrCreate()?.getOrNull()
+        if (identity != null) {
+          val nonce = ByteArray(16).also { SecureRandom().nextBytes(it) }
+          val nonceB64 = Base64.getEncoder().encodeToString(nonce)
+          val transcript = "$nonceB64:${current.payload.initiatorDeviceId}".toByteArray(StandardCharsets.UTF_8)
+          val sigBytes = deviceIdentity.sign(transcript).getOrNull()
+          val sigB64 = sigBytes?.let { Base64.getEncoder().encodeToString(it) } ?: ""
+
+          val exchangePayload = PairingExchangePayload(
+            version = 1,
+            sessionId = current.payload.sessionId,
+            responderDeviceId = identity.id,
+            responderPublicKeyBase64 = identity.publicKey,
+            responderDisplayName = responderDisplayName,
+            responderNonceBase64 = nonceB64,
+            responderSignatureBase64 = sigB64,
+            responderIp = NetworkUtils.getLocalIpAddress(),
+            responderPort = 53317,
           )
-          val authResult = securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig)
-          val token = authResult.getOrElse { error ->
-            if (securityGate.isPinConfigured()) {
-              _uiState.value = current.copy(
-                isAuthenticating = false,
-                showPinDialog = true,
-                errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
+
+          val exchangeResult = localHttpClient.sendPairingExchange(targetIp, targetPort, exchangePayload)
+          if (exchangeResult.isSuccess) {
+            val remoteIdentity = RemoteDeviceIdentity(
+              deviceId = current.payload.initiatorDeviceId,
+              publicKeyBase64 = current.payload.initiatorPublicKeyBase64,
+              displayName = current.payload.initiatorDisplayName,
+            )
+            pairingEngine.completeDirectPairing(remoteIdentity)
+            localNetworkDiscovery?.addVirtualDiscoveredDevice(
+              com.peykr.app.domain.transfer.DiscoveredDevice(
+                deviceId = current.payload.initiatorDeviceId,
+                displayName = current.payload.initiatorDisplayName,
+                deviceModel = "Android",
+                ipAddress = targetIp,
+                port = targetPort,
+                fingerprint = current.payload.initiatorPublicKeyBase64,
+                lastSeenEpochMillis = System.currentTimeMillis()
               )
-            } else {
-              _uiState.value = current.copy(
-                isAuthenticating = false,
-                showSetupPinDialog = true,
-                errorMessage = null,
-              )
-            }
+            )
+            localNetworkDiscovery?.cachePeerAddress(current.payload.initiatorDeviceId, targetIp, targetPort)
+            _uiState.value = PairingUiState.Success(
+              role = PairingRole.RESPONDER,
+              remoteName = current.payload.initiatorDisplayName,
+              remoteFingerprint = formatFingerprint(current.payload.initiatorDeviceId),
+            )
             return@launch
           }
-          executeResponderApproval(current, token, responderDisplayName)
         }
       }
+
+      // 2. Optical pairing fallback: obtain authorization token and proceed
+      val tokenResult = securityGate.authorizeDirect(SecurityGateScope.APPROVE_TRUSTED_DEVICE)
+      val token = tokenResult.getOrElse {
+        val promptConfig = AuthPromptConfig(
+          title = "Approve Device Pairing",
+          description = "Authenticate to request pairing with ${current.remoteName}",
+        )
+        securityGate.authorize(SecurityGateScope.APPROVE_TRUSTED_DEVICE, promptConfig).getOrElse { error ->
+          if (securityGate.isPinConfigured()) {
+            _uiState.value = current.copy(
+              isAuthenticating = false,
+              showPinDialog = true,
+              errorMessage = "Biometric authentication not completed. Enter PIN to approve.",
+            )
+          } else {
+            _uiState.value = current.copy(
+              isAuthenticating = false,
+              showSetupPinDialog = true,
+              errorMessage = null,
+            )
+          }
+          return@launch
+        }
+      }
+      executeResponderApproval(current, token, responderDisplayName)
     }
   }
 
@@ -649,6 +723,7 @@ class PairingViewModel(
 
   fun cancelPairing() {
     scope.launch {
+      localHttpServer?.activeQrPayload = null
       activeSession?.let { session ->
         pairingEngine.cancelSession(session)
       }
@@ -658,8 +733,70 @@ class PairingViewModel(
   }
 
   fun resetToRoleSelection() {
+    localHttpServer?.activeQrPayload = null
     activeSession = null
     _uiState.value = PairingUiState.RoleSelection
+  }
+
+  fun onManualInput(input: String) {
+    val trimmed = input.trim()
+    if (trimmed.startsWith("{")) {
+      onResponderScannedInitialQr(trimmed)
+      return
+    }
+
+    val cleanCode = trimmed.replace(" ", "")
+    if (cleanCode.length == 6 && cleanCode.all { it.isDigit() }) {
+      scope.launch {
+        // 1. Probe already discovered peers for matching one-time code
+        val discovered = (localNetworkDiscovery?.discoveredDevices?.value ?: emptyList())
+        for (dev in discovered) {
+          try {
+            val url = java.net.URL("http://${dev.ipAddress}:${dev.port}/api/peykr/v1/pair/qr")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+              connectTimeout = 1500
+              readTimeout = 1500
+            }
+            if (conn.responseCode == 200) {
+              val jsonStr = conn.inputStream.bufferedReader().use { it.readText() }
+              val parseResult = PairingQrPayload.parse(jsonStr)
+              val payload = parseResult.getOrNull()
+              if (payload != null && payload.computeOneTimeCode().replace(" ", "") == cleanCode) {
+                onResponderScannedInitialQr(jsonStr)
+                return@launch
+              }
+            }
+          } catch (_: Exception) {}
+        }
+
+        // 2. Probe local subnet if not yet discovered
+        val probedList = localNetworkDiscovery?.probeSubnet(53317) ?: emptyList()
+        for (dev in probedList) {
+          try {
+            val url = java.net.URL("http://${dev.ipAddress}:${dev.port}/api/peykr/v1/pair/qr")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+              connectTimeout = 1500
+              readTimeout = 1500
+            }
+            if (conn.responseCode == 200) {
+              val jsonStr = conn.inputStream.bufferedReader().use { it.readText() }
+              val parseResult = PairingQrPayload.parse(jsonStr)
+              val payload = parseResult.getOrNull()
+              if (payload != null && payload.computeOneTimeCode().replace(" ", "") == cleanCode) {
+                onResponderScannedInitialQr(jsonStr)
+                return@launch
+              }
+            }
+          } catch (_: Exception) {}
+        }
+
+        _uiState.value = PairingUiState.ResponderScanInitialQr(
+          errorMessage = "Kod ($cleanCode) ile eşleşen cihaz yerel ağda bulunamadı. Lütfen QR kodunu tarayın veya karşı cihazdaki 'Kopyala' butonundan metni yapıştırın."
+        )
+      }
+    } else {
+      onResponderScannedInitialQr(trimmed)
+    }
   }
 
   fun formatFingerprint(deviceIdHex: String): String {

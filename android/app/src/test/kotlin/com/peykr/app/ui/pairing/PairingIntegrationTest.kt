@@ -22,6 +22,7 @@ import com.peykr.app.domain.pairing.PairingResponse
 import com.peykr.app.domain.pairing.PairingRole
 import com.peykr.app.domain.pairing.QrMessageClassifier
 import com.peykr.app.domain.pairing.QrMessageType
+import com.peykr.app.domain.pairing.RemoteDeviceIdentity
 import com.peykr.app.domain.pairing.StrictBase64
 import com.peykr.app.ui.pairing.qr.QrCodeGenerator
 import kotlinx.coroutines.flow.Flow
@@ -405,6 +406,32 @@ class PairingIntegrationTest {
     // A receives request from blocked device B
     val receiveResult = engineA.receivePairingRequest(sessionA, requestResult.request)
     assertTrue("Pairing with blocked device must fail", receiveResult.isFailure)
+  }
+
+  @Test
+  fun directPairing_viaCompleteDirectPairing_savesPairedContactMutually() = runTest {
+    val deviceA = TestDeviceIdentity("DeviceA")
+    val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val repoA = InMemoryContactRepository()
+    val engineA = DefaultPairingEngine(deviceA, gateA, repoA)
+
+    val deviceB = TestDeviceIdentity("DeviceB")
+    val gateB = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val repoB = InMemoryContactRepository()
+    val engineB = DefaultPairingEngine(deviceB, gateB, repoB)
+
+    // Mutual direct pairing
+    val contactForA = engineA.completeDirectPairing(
+      RemoteDeviceIdentity(deviceB.deviceId, deviceB.publicKeyBase64, "Bob")
+    ).getOrThrow()
+    val contactForB = engineB.completeDirectPairing(
+      RemoteDeviceIdentity(deviceA.deviceId, deviceA.publicKeyBase64, "Alice")
+    ).getOrThrow()
+
+    assertEquals(PairingStatus.PAIRED, contactForA.pairingStatus)
+    assertEquals(PairingStatus.PAIRED, contactForB.pairingStatus)
+    assertEquals(PairingStatus.PAIRED, repoA.getById(deviceB.deviceId)?.pairingStatus)
+    assertEquals(PairingStatus.PAIRED, repoB.getById(deviceA.deviceId)?.pairingStatus)
   }
 }
 

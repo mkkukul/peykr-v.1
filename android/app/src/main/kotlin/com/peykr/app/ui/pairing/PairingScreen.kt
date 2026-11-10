@@ -72,6 +72,10 @@ import com.peykr.app.ui.theme.PeykrScreenContainer
 import com.peykr.app.ui.theme.PeykrTheme
 import com.peykr.app.ui.theme.PremiumIcon
 import com.peykr.app.ui.theme.PremiumIconKind
+import com.peykr.app.domain.contacts.TrustedContactRepository
+import com.peykr.app.domain.localsend.LocalHttpClient
+import com.peykr.app.domain.localsend.LocalHttpServer
+import com.peykr.app.domain.localsend.LocalNetworkDiscovery
 import com.peykr.app.ui.theme.SuccessGreen
 
 @Composable
@@ -80,11 +84,23 @@ fun PairingScreen(
   pairingEngine: PairingEngine,
   securityGate: SecurityGate,
   deviceIdentity: DeviceIdentity? = null,
+  localHttpClient: LocalHttpClient? = null,
+  contactRepository: TrustedContactRepository? = null,
+  localHttpServer: LocalHttpServer? = null,
+  localNetworkDiscovery: LocalNetworkDiscovery? = null,
   viewModel: PairingViewModel? = null,
   modifier: Modifier = Modifier,
 ) {
   val actualViewModel = viewModel ?: viewModel {
-    PairingViewModel(pairingEngine, securityGate, deviceIdentity)
+    PairingViewModel(
+      pairingEngine = pairingEngine,
+      securityGate = securityGate,
+      deviceIdentity = deviceIdentity,
+      localHttpClient = localHttpClient,
+      contactRepository = contactRepository,
+      localHttpServer = localHttpServer,
+      localNetworkDiscovery = localNetworkDiscovery,
+    )
   }
   val state by actualViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -756,6 +772,57 @@ private fun ScannerContent(
         modifier = Modifier.fillMaxSize(),
         onQrCodeScanned = onScanned,
       )
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    // Manual input fallback
+    var manualText by remember { mutableStateOf("") }
+    PeykrCard(
+      modifier = Modifier.fillMaxWidth(),
+      containerColor = PeykrTheme.colors.surfaceElevated,
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Text(
+          text = "Veya Eşleştirme Kodunu / Metnini Yapıştırın",
+          style = MaterialTheme.typography.labelMedium,
+          fontWeight = FontWeight.SemiBold,
+          color = PeykrTheme.colors.textSecondary,
+        )
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          OutlinedTextField(
+            value = manualText,
+            onValueChange = { manualText = it },
+            placeholder = { Text("Eşleştirme JSON veya kodu...", style = MaterialTheme.typography.bodySmall) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedBorderColor = PeykrTheme.colors.primaryAccent,
+              cursorColor = PeykrTheme.colors.primaryAccent,
+            )
+          )
+          Button(
+            onClick = {
+              if (manualText.isNotBlank()) {
+                onScanned(manualText.trim())
+                manualText = ""
+              }
+            },
+            enabled = manualText.isNotBlank(),
+            colors = ButtonDefaults.buttonColors(containerColor = PeykrTheme.colors.primaryAccent),
+            shape = RoundedCornerShape(10.dp)
+          ) {
+            Text("İşle", fontWeight = FontWeight.Bold)
+          }
+        }
+      }
     }
   }
 }

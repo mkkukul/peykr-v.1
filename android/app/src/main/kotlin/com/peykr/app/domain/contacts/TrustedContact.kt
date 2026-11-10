@@ -1,6 +1,17 @@
 package com.peykr.app.domain.contacts
 
-enum class PairingStatus { NOT_PAIRED, PENDING, PAIRED, REVOKED, BLOCKED }
+enum class PairingStatus {
+  NOT_PAIRED,
+  PAIRING,
+  PAIRED,
+  FAILED,
+  REVOKED,
+  BLOCKED;
+
+  companion object {
+    val PENDING = PAIRING
+  }
+}
 
 data class TrustedContact(
   val id: String,

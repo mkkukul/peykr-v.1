@@ -6,6 +6,12 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import android.util.Log
 import com.peykr.app.domain.transfer.DiscoveredDevice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -152,6 +158,31 @@ class LocalNetworkDiscovery(
           devicesMap[info.serviceName] = device
           _discoveredDevices.value = devicesMap.values.toList()
           Log.i(TAG, "Resolved Peykr device on LAN: $displayName ($host:$port)")
+
+          // Fetch full info over HTTP in background to resolve exact deviceId/fingerprint if attributes were omitted by mDNS router
+          kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+              val conn = (java.net.URL("http://$host:$port/api/peykr/v1/info").openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 2000
+                readTimeout = 2000
+              }
+              if (conn.responseCode == 200) {
+                val resp = conn.inputStream.bufferedReader().use { it.readText() }
+                val json = org.json.JSONObject(resp)
+                val fullId = json.optString("deviceId", deviceId)
+                val fullName = json.optString("displayName", displayName)
+                val fullFp = json.optString("fingerprint", fingerprint)
+                if (fullId != localDeviceId) {
+                  val updated = device.copy(deviceId = fullId, displayName = fullName, fingerprint = fullFp)
+                  devicesMap[info.serviceName] = updated
+                  _discoveredDevices.value = devicesMap.values.toList()
+                }
+              }
+              conn.disconnect()
+            } catch (_: Exception) {
+              // Ignore background resolution error
+            }
+          }
         }
       })
     } catch (e: Exception) {
@@ -176,7 +207,79 @@ class LocalNetworkDiscovery(
   // Virtual device discovery helper for testing and offline environments
   fun addVirtualDiscoveredDevice(device: DiscoveredDevice) {
     devicesMap[device.deviceId] = device
+    cachePeerAddress(device.deviceId, device.ipAddress, device.port)
     _discoveredDevices.value = devicesMap.values.toList()
+  }
+
+  private val peerAddressCache = ConcurrentHashMap<String, Pair<String, Int>>()
+
+  fun cachePeerAddress(deviceId: String, ipAddress: String, port: Int = 53317) {
+    if (deviceId.isNotBlank() && ipAddress.isNotBlank()) {
+      peerAddressCache[deviceId] = Pair(ipAddress, port)
+    }
+  }
+
+  fun getCachedPeerAddress(deviceId: String): Pair<String, Int>? {
+    return peerAddressCache[deviceId]
+  }
+
+  suspend fun probeSubnet(port: Int = 53317): List<DiscoveredDevice> = withContext(Dispatchers.IO) {
+    val localIp = com.peykr.app.core.network.NetworkUtils.getLocalIpAddress() ?: return@withContext emptyList()
+    val parts = localIp.split(".")
+    if (parts.size != 4) return@withContext emptyList()
+    val prefix = "${parts[0]}.${parts[1]}.${parts[2]}"
+    val found = mutableListOf<DiscoveredDevice>()
+    coroutineScope {
+      val deferreds = (1..254).mapNotNull { hostNum ->
+        val candidateIp = "$prefix.$hostNum"
+        if (candidateIp == localIp) null
+        else async {
+          probeHost(candidateIp, port)
+        }
+      }
+      deferreds.forEach { deferred ->
+        val dev = deferred.await()
+        if (dev != null) found.add(dev)
+      }
+    }
+    found
+  }
+
+  suspend fun probeHost(host: String, port: Int = 53317): DiscoveredDevice? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    try {
+      val conn = (java.net.URL("http://$host:$port/api/peykr/v1/info").openConnection() as java.net.HttpURLConnection).apply {
+        connectTimeout = 2000
+        readTimeout = 2000
+      }
+      if (conn.responseCode == 200) {
+        val resp = conn.inputStream.bufferedReader().use { it.readText() }
+        conn.disconnect()
+        val json = org.json.JSONObject(resp)
+        val remoteId = json.optString("deviceId")
+        val remoteName = json.optString("displayName", "Peykr Cihazı")
+        val remoteModel = json.optString("model", "Android")
+        val remoteFp = json.optString("fingerprint", "")
+        if (remoteId.isNotBlank() && remoteId != localDeviceId) {
+          val device = DiscoveredDevice(
+            deviceId = remoteId,
+            displayName = remoteName,
+            deviceModel = remoteModel,
+            ipAddress = host,
+            port = port,
+            fingerprint = remoteFp,
+            lastSeenEpochMillis = System.currentTimeMillis()
+          )
+          devicesMap[remoteId] = device
+          _discoveredDevices.value = devicesMap.values.toList()
+          Log.i(TAG, "Directly discovered peer at $host:$port: $remoteName ($remoteId)")
+          return@withContext device
+        }
+      }
+      conn.disconnect()
+      null
+    } catch (_: Exception) {
+      null
+    }
   }
 
   fun removeVirtualDiscoveredDevice(deviceId: String) {

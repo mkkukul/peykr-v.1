@@ -81,6 +81,16 @@ class DefaultSecurityGate(
     }
   }
 
+  override suspend fun authorizeDirect(scope: SecurityGateScope): Result<AuthorizationToken> {
+    val token = AuthorizationToken(
+      scope = scope,
+      grantedAtEpochMillis = timeProvider(),
+      validDurationMillis = tokenValidityDurationMillis,
+    )
+    activeTokens[token.tokenValue] = token
+    return Result.success(token)
+  }
+
   override fun verifyAuthorization(token: AuthorizationToken?, requiredScope: SecurityGateScope): Boolean {
     if (token == null) return false
     val registered = activeTokens[token.tokenValue] ?: return false

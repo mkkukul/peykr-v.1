@@ -79,6 +79,7 @@ interface MessagingRepository {
   )
   suspend fun deleteMessage(messageId: String)
   suspend fun deleteConversation(conversationId: String)
+  suspend fun getMessageById(messageId: String): Message? = null
   suspend fun getGroupMembers(conversationId: String): List<GroupMember>
   suspend fun addGroupMember(member: GroupMember)
   suspend fun removeGroupMember(conversationId: String, contactId: String)

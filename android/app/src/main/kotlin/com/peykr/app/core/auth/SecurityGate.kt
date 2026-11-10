@@ -21,6 +21,8 @@ interface SecurityGate {
   fun getRequiredAuthMethod(): RequiredAuthMethod
   suspend fun authorize(scope: SecurityGateScope, config: AuthPromptConfig): Result<AuthorizationToken>
   suspend fun authorizeWithPin(scope: SecurityGateScope, pin: String): Result<AuthorizationToken>
+  suspend fun authorizeDirect(scope: SecurityGateScope = SecurityGateScope.APPROVE_TRUSTED_DEVICE): Result<AuthorizationToken> =
+    Result.failure(UnsupportedOperationException("authorizeDirect not supported"))
   fun verifyAuthorization(token: AuthorizationToken?, requiredScope: SecurityGateScope): Boolean
   fun consumeAuthorization(token: AuthorizationToken?): Boolean
   suspend fun <T> withAuthorization(

@@ -149,6 +149,7 @@ fun MainScreen(
   var isSendingSos by remember { mutableStateOf(false) }
   var showSosConfirmedNotification by remember { mutableStateOf(false) }
   var sosDeliverySummary by remember { mutableStateOf("") }
+  var sosDeliveredSuccessfully by remember { mutableStateOf(false) }
   var showNotificationAlert by remember { mutableStateOf(false) }
 
   val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -586,6 +587,8 @@ fun MainScreen(
                 "🚨 ACİL DURUM (SOS): Acil yardım çağrısı! (GPS uydusu kilitlenemedi veya konum servisleri kapalı)"
               }
 
+              var deliveredCount = 0
+              var queuedCount = 0
               for (contact in recipients) {
                 if (coords != null) {
                   locationSafetyEngine?.startSharingLocation(
@@ -596,19 +599,27 @@ fun MainScreen(
                   )
                   locationSafetyEngine?.createSignedLocationPayload(coords)
                 }
-                transportManager?.sendReliableMessage(
+                val res = transportManager?.sendReliableMessage(
                   conversationId = "conv_${contact.id}",
                   recipientDeviceId = contact.id,
                   text = sosText,
                   recipientPublicKeyBase64 = contact.publicIdentity,
                 )
+                if (res?.status == com.peykr.app.domain.messaging.MessageStatus.DELIVERED) {
+                  deliveredCount++
+                } else {
+                  queuedCount++
+                }
               }
               isSendingSos = false
               showSosDialog = false
-              sosDeliverySummary = if (coords != null) {
-                "Acil durum sinyali ve doğrulanmış GPS konumunuz (${coords.latitude.toString().take(7)}, ${coords.longitude.toString().take(7)}) uçtan uca şifrelenerek ${recipients.size} güvenilir kişiye iletildi."
+              sosDeliveredSuccessfully = (deliveredCount > 0)
+              sosDeliverySummary = if (deliveredCount > 0) {
+                val locPart = if (coords != null) " (${coords.latitude.toString().take(7)}, ${coords.longitude.toString().take(7)})" else ""
+                "Acil durum sinyali ve GPS konumunuz$locPart $deliveredCount güvenilir cihaza ulaştı ve alıcı tarafından kriptografik olarak doğrulandı." +
+                  (if (queuedCount > 0) "\n\n$queuedCount kişi çevrimdışı olduğu için mesaj yerel kuyruğa alındı." else "")
               } else {
-                "Acil durum sinyali iletildi. Not: Cihaz konum koordinatları alınamadığı için konum verisi eklenemedi."
+                "Güvenilir cihazlar şu an doğrudan çevrimiçi değil. Acil durum uyarısı çevrimdışı kuyruğa alındı ve cihazlar ağa veya mesh kapsama alanına girdiğinde otomatik iletilecektir."
               }
               showSosConfirmedNotification = true
             }
@@ -637,12 +648,20 @@ fun MainScreen(
       onDismissRequest = { showSosConfirmedNotification = false },
       containerColor = PeykrTheme.colors.surface,
       shape = RoundedCornerShape(22.dp),
-      title = { Text("SOS İletildi", color = SuccessGreen, fontWeight = FontWeight.Bold) },
+      title = {
+        Text(
+          text = if (sosDeliveredSuccessfully) "SOS İletildi (Doğrulandı)" else "SOS Kuyruğa Alındı",
+          color = if (sosDeliveredSuccessfully) SuccessGreen else Color(0xFFD97706),
+          fontWeight = FontWeight.Bold
+        )
+      },
       text = { Text(sosDeliverySummary, color = PeykrTheme.colors.textPrimary) },
       confirmButton = {
         Button(
           onClick = { showSosConfirmedNotification = false },
-          colors = ButtonDefaults.buttonColors(containerColor = PeykrTheme.colors.primaryAccent),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = if (sosDeliveredSuccessfully) SuccessGreen else PeykrTheme.colors.primaryAccent
+          ),
           shape = RoundedCornerShape(12.dp)
         ) {
           Text("Tamam", color = Color.White)
@@ -757,6 +776,10 @@ fun TrustedPeopleScreen(
 ) {
   val actualViewModel = viewModel ?: viewModel { MainScreenViewModel(contactRepository, deviceIdentity) }
   val state by actualViewModel.uiState.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+  val container = context.applicationContext as? AppContainer
+  val discovery = container?.localNetworkDiscovery
+  val discoveredDevices by (discovery?.discoveredDevices?.collectAsStateWithLifecycle(emptyList()) ?: remember { mutableStateOf(emptyList()) })
   var contactToDelete by remember { mutableStateOf<TrustedContact?>(null) }
   var searchQuery by remember { mutableStateOf("") }
 
@@ -950,8 +973,14 @@ fun TrustedPeopleScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
               ) {
                 items(people, key = { it.id }) { contact ->
+                  val isOnline = discoveredDevices.any {
+                    it.deviceId == contact.id ||
+                    (contact.publicIdentity != null && it.fingerprint == contact.publicIdentity) ||
+                    it.deviceId.equals(contact.id, ignoreCase = true)
+                  }
                   ContactCard(
                     contact = contact,
+                    isOnline = isOnline,
                     onDelete = { contactToDelete = contact },
                     onMessage = { onNavigate(MessagesList) }
                   )
@@ -996,6 +1025,7 @@ fun TrustedPeopleScreen(
 @Composable
 private fun ContactCard(
   contact: TrustedContact,
+  isOnline: Boolean = false,
   onDelete: () -> Unit,
   onMessage: () -> Unit
 ) {
@@ -1047,7 +1077,7 @@ private fun ContactCard(
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp
           )
-          ContactStatusBadge(contact.pairingStatus)
+          ContactStatusBadge(contact.pairingStatus, isOnline)
         }
 
         Spacer(Modifier.height(4.dp))
@@ -1092,13 +1122,20 @@ private fun ContactCard(
 }
 
 @Composable
-private fun ContactStatusBadge(status: PairingStatus) {
+private fun ContactStatusBadge(status: PairingStatus, isOnline: Boolean = false) {
   val (label, bg, fg) = when (status) {
-    PairingStatus.PAIRED -> Triple("Eşleşti", SuccessGreenLight, SuccessGreen)
-    PairingStatus.PENDING -> Triple("Beklemede", Color(0xFFFEF3C7), Color(0xFFD97706))
+    PairingStatus.PAIRED -> {
+      if (isOnline) {
+        Triple("Eşleşti (Çevrimiçi)", Color(0xFFDCFCE7), Color(0xFF15803D))
+      } else {
+        Triple("Eşleşti (Çevrimdışı)", Color(0xFFF1F5F9), Color(0xFF64748B))
+      }
+    }
+    PairingStatus.PAIRING -> Triple("Eşleşme Sürüyor", Color(0xFFFEF3C7), Color(0xFFD97706))
+    PairingStatus.NOT_PAIRED -> Triple("Eşleşmedi", Color(0xFFFEE2E2), Color(0xFFDC2626))
+    PairingStatus.FAILED -> Triple("Eşleştirme Başarısız", Color(0xFFFEE2E2), Color(0xFFDC2626))
     PairingStatus.REVOKED -> Triple("İptal Edildi", ErrorRedLight, ErrorRed)
     PairingStatus.BLOCKED -> Triple("Engellendi", Color(0xFFF1F5F9), Color(0xFF64748B))
-    PairingStatus.NOT_PAIRED -> Triple("Eşleşmedi", Color(0xFFF1F5F9), Color(0xFF64748B))
   }
   PeykrBadge(text = label, color = fg, backgroundColor = bg)
 }

@@ -16,7 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.peykr.app.domain.contacts.TrustedContact
 import java.nio.charset.StandardCharsets
 
 data class VerifiedDeliveryResult(
@@ -67,30 +69,55 @@ class TransportManager(
     scope.launch(Dispatchers.Unconfined) {
       localNetworkDiscovery.discoveredDevices.collect { devices ->
         updateConnectivityState { it.copy(isWifiActive = true, wifiPeersCount = devices.size) }
-        devices.forEach { dev ->
-          val pending = bleMeshEngine.offlineQueue.drainForPeer(dev.deviceId)
-          val contact = contactRepository?.getById(dev.deviceId)
-          val targetPubKey = contact?.publicIdentity
-          if (contact != null && contact.pairingStatus == com.peykr.app.domain.contacts.PairingStatus.PAIRED && targetPubKey != null) {
-            pending.forEach { packet ->
-              val text = String(packet.payload, StandardCharsets.UTF_8)
-              val encResult = messagingEngine.sendTextMessage(
-                conversationId = "conv_${packet.recipientDeviceId}",
-                recipientId = packet.recipientDeviceId,
-                text = text,
-                recipientPublicKeyBase64 = targetPubKey,
-              )
-              if (encResult.isSuccess) {
-                val (retryMsg, encMsg) = encResult.getOrThrow()
-                val sent = localHttpClient.sendDirectMessage(dev, retryMsg, encMsg).getOrDefault(false)
-                if (sent) {
-                  bleMeshEngine.offlineQueue.acknowledgeDelivery(packet.packetId)
-                  messagingRepository.updateMessageDelivery(
-                    messageId = packet.packetId,
-                    status = MessageStatus.DELIVERED,
-                    transportType = MessageTransportType.LOCAL_WIFI,
-                    deliveryTime = System.currentTimeMillis()
-                  )
+        val allContacts = contactRepository?.let { repo ->
+          runCatching { repo.contacts.first() }.getOrDefault(emptyList())
+        } ?: emptyList()
+
+        for (dev in devices) {
+          val matchingContacts = allContacts.filter { c ->
+            c.id == dev.deviceId || c.id.equals(dev.deviceId, ignoreCase = true) ||
+              (c.publicIdentity != null && c.publicIdentity == dev.fingerprint) ||
+              (c.id.length >= 8 && dev.deviceId.removePrefix("Peykr-").startsWith(c.id.take(8), ignoreCase = true))
+          }
+
+          val candidateIds = (listOf(dev.deviceId) + matchingContacts.map { it.id }).distinct()
+          for (peerId in candidateIds) {
+            val pending = bleMeshEngine.offlineQueue.drainForPeer(peerId)
+            val contact = matchingContacts.firstOrNull { it.id == peerId } ?: contactRepository?.getById(peerId)
+            val targetPubKey = contact?.publicIdentity ?: dev.fingerprint.takeIf { it.isNotBlank() }
+            if (contact != null && contact.pairingStatus == com.peykr.app.domain.contacts.PairingStatus.PAIRED && targetPubKey != null) {
+              for (packet in pending) {
+                val text = String(packet.payload, StandardCharsets.UTF_8)
+                val encResult = messagingEngine.sendTextMessage(
+                  conversationId = "conv_${packet.recipientDeviceId}",
+                  recipientId = packet.recipientDeviceId,
+                  text = text,
+                  recipientPublicKeyBase64 = targetPubKey,
+                  messageId = packet.packetId,
+                )
+                if (encResult.isSuccess) {
+                  val (retryMsg, encMsg) = encResult.getOrThrow()
+                  val directResult = localHttpClient.sendDirectMessage(dev, retryMsg, encMsg)
+                  if (directResult.isSuccess) {
+                    val ack = directResult.getOrThrow()
+                    val verified = if (ack.ackPayload != null && ack.ackSignature != null && targetPubKey != null) {
+                      com.peykr.app.core.security.CryptoPrimitives.verifySignature(
+                        publicKeyBase64 = targetPubKey,
+                        data = ack.ackPayload.toByteArray(StandardCharsets.UTF_8),
+                        signature = java.util.Base64.getDecoder().decode(ack.ackSignature)
+                      )
+                    } else ack.success
+
+                    if (verified) {
+                      bleMeshEngine.offlineQueue.acknowledgeDelivery(packet.packetId)
+                      messagingRepository.updateMessageDelivery(
+                        messageId = packet.packetId,
+                        status = MessageStatus.DELIVERED,
+                        transportType = MessageTransportType.LOCAL_WIFI,
+                        deliveryTime = System.currentTimeMillis()
+                      )
+                    }
+                  }
                 }
               }
             }
@@ -144,17 +171,27 @@ class TransportManager(
     }
 
     val contact = contactRepository?.getById(recipientDeviceId)
+      ?: runCatching {
+        val list = contactRepository?.contacts?.first()
+        list?.firstOrNull { it.id.equals(recipientDeviceId, ignoreCase = true) }
+      }.getOrNull()
+
     val targetDeviceId = contact?.id ?: recipientDeviceId
     val targetFingerprint = contact?.publicIdentity
 
     // 2. Check Local Wi-Fi LAN availability (LocalSend model)
-    val wifiTarget = localNetworkDiscovery.discoveredDevices.value.firstOrNull {
+    var wifiTarget = localNetworkDiscovery.discoveredDevices.value.firstOrNull {
       it.deviceId == targetDeviceId ||
       it.deviceId == recipientDeviceId ||
-      (targetFingerprint != null && it.fingerprint == targetFingerprint) ||
-      it.fingerprint == recipientDeviceId ||
-      it.deviceId.equals(targetDeviceId, ignoreCase = true) ||
-      it.fingerprint.equals(targetDeviceId, ignoreCase = true)
+      (targetFingerprint != null && it.fingerprint == targetFingerprint)
+    }
+
+    if (wifiTarget == null) {
+      val cached = localNetworkDiscovery.getCachedPeerAddress(targetDeviceId)
+        ?: localNetworkDiscovery.getCachedPeerAddress(recipientDeviceId)
+      if (cached != null) {
+        wifiTarget = localNetworkDiscovery.probeHost(cached.first, cached.second)
+      }
     }
 
     if (wifiTarget != null) {
@@ -192,15 +229,28 @@ class TransportManager(
 
       val (msg, encMsg) = encResult.getOrThrow()
       val directResult = localHttpClient.sendDirectMessage(wifiTarget, msg, encMsg)
-      if (directResult.getOrDefault(false)) {
-        val now = System.currentTimeMillis()
-        messagingRepository.updateMessageDelivery(msg.id, MessageStatus.DELIVERED, MessageTransportType.LOCAL_WIFI, now)
-        return VerifiedDeliveryResult(
-          messageId = msg.id,
-          status = MessageStatus.DELIVERED,
-          transportType = MessageTransportType.LOCAL_WIFI,
-          verifiedDeliveryEpochMillis = now,
-        )
+      if (directResult.isSuccess) {
+        val ack = directResult.getOrThrow()
+        val verified = if (ack.ackPayload != null && ack.ackSignature != null && targetPubKey != null) {
+          com.peykr.app.core.security.CryptoPrimitives.verifySignature(
+            publicKeyBase64 = targetPubKey,
+            data = ack.ackPayload.toByteArray(StandardCharsets.UTF_8),
+            signature = java.util.Base64.getDecoder().decode(ack.ackSignature)
+          )
+        } else ack.success
+
+        if (verified) {
+          val now = System.currentTimeMillis()
+          messagingRepository.updateMessageDelivery(msg.id, MessageStatus.DELIVERED, MessageTransportType.LOCAL_WIFI, now)
+          return VerifiedDeliveryResult(
+            messageId = msg.id,
+            status = MessageStatus.DELIVERED,
+            transportType = MessageTransportType.LOCAL_WIFI,
+            verifiedDeliveryEpochMillis = now,
+          )
+        } else {
+          Log.w(TAG, "Cryptographic delivery acknowledgement verification failed from $recipientDeviceId")
+        }
       }
     }
 

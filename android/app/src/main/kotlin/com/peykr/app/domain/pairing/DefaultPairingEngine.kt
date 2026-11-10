@@ -80,6 +80,7 @@ class DefaultPairingEngine(
         PairingSessionState.QR_READY,
       )
 
+      val localIp = com.peykr.app.core.network.NetworkUtils.getLocalIpAddress()
       val payload = PairingQrPayload(
         version = PairingQrPayload.CURRENT_VERSION,
         sessionId = currentSession.sessionId,
@@ -88,6 +89,8 @@ class DefaultPairingEngine(
         initiatorDisplayName = currentSession.localDisplayName,
         initiatorNonceBase64 = currentSession.localNonceBase64,
         expiresAtEpochMillis = currentSession.expiresAtEpochMillis,
+        initiatorIp = localIp,
+        initiatorPort = 53317,
       )
 
       val updatedSession = currentSession.copy(state = PairingSessionState.QR_READY)
@@ -591,18 +594,44 @@ class DefaultPairingEngine(
       val cancelledSession = currentSession.copy(state = PairingSessionState.REJECTED)
       activeSessions[currentSession.sessionId] = cancelledSession
 
-      // If contact was in PENDING, clean up / demote to NOT_PAIRED
+      // If contact was unconfirmed in PENDING, clean up temporary record without overwriting valid pairings
       currentSession.remoteIdentity?.let { remote ->
         try {
           val existing = contactRepository.getById(remote.deviceId)
           if (existing != null && existing.pairingStatus == PairingStatus.PENDING) {
-            contactRepository.update(existing.copy(pairingStatus = PairingStatus.NOT_PAIRED))
+            contactRepository.delete(existing.id)
           }
         } catch (_: Throwable) {}
       }
 
       cancelledSession
     }
+  }
+
+  override suspend fun completeDirectPairing(
+    remoteIdentity: RemoteDeviceIdentity,
+  ): Result<TrustedContact> = runCatching {
+    if (!remoteIdentity.verifyDeviceId()) {
+      throw PairingException.DeviceIdMismatch(remoteIdentity.deviceId, "Public key digest mismatch")
+    }
+    val localId = getReadyIdentity().id
+    if (remoteIdentity.deviceId == localId) {
+      throw PairingException.SelfPairingProhibited("Cannot pair a device with itself")
+    }
+    val contact = TrustedContact(
+      id = remoteIdentity.deviceId,
+      displayName = remoteIdentity.displayName,
+      publicIdentity = remoteIdentity.publicKeyBase64,
+      pairingStatus = PairingStatus.PAIRED,
+      createdAtEpochMillis = timeProvider(),
+    )
+    val existing = contactRepository.getById(contact.id)
+    if (existing == null) {
+      contactRepository.add(contact)
+    } else {
+      contactRepository.update(contact)
+    }
+    contact
   }
 
   private suspend fun saveContactWithStatus(

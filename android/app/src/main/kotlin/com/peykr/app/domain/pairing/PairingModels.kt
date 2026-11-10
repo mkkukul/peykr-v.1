@@ -252,6 +252,8 @@ data class PairingQrPayload(
   val initiatorDisplayName: String,
   val initiatorNonceBase64: String,
   val expiresAtEpochMillis: Long,
+  val initiatorIp: String? = null,
+  val initiatorPort: Int = 53317,
 ) {
   fun serialize(): String {
     return buildString {
@@ -269,6 +271,12 @@ data class PairingQrPayload(
       append(JsonUtils.escape(initiatorNonceBase64))
       append("\",\"exp\":")
       append(expiresAtEpochMillis)
+      if (initiatorIp != null) {
+        append(",\"ip\":\"")
+        append(JsonUtils.escape(initiatorIp))
+        append("\",\"port\":")
+        append(initiatorPort)
+      }
       append("}")
     }
   }
@@ -308,6 +316,8 @@ data class PairingQrPayload(
         val initiatorDisplayName = JsonUtils.extractString(trimmed, "name") ?: throw PairingException.MalformedPayload("Missing 'name'")
         val initiatorNonceBase64 = JsonUtils.extractString(trimmed, "nonce") ?: throw PairingException.MalformedPayload("Missing 'nonce'")
         val expiresAtEpochMillis = JsonUtils.extractLong(trimmed, "exp") ?: throw PairingException.MalformedPayload("Missing or invalid 'exp'")
+        val initiatorIp = JsonUtils.extractString(trimmed, "ip")
+        val initiatorPort = JsonUtils.extractInt(trimmed, "port") ?: 53317
 
         if (version != CURRENT_VERSION) {
           throw PairingException.ProtocolVersionMismatch("Expected protocol version $CURRENT_VERSION but got $version")
@@ -334,11 +344,35 @@ data class PairingQrPayload(
           initiatorDisplayName = RemoteDeviceIdentity.normalizeDisplayName(initiatorDisplayName),
           initiatorNonceBase64 = initiatorNonceBase64,
           expiresAtEpochMillis = expiresAtEpochMillis,
+          initiatorIp = initiatorIp,
+          initiatorPort = initiatorPort,
         )
       }
     }
   }
 }
+
+data class PairingExchangePayload(
+  val version: Int = 1,
+  val sessionId: String,
+  val responderDeviceId: String,
+  val responderPublicKeyBase64: String,
+  val responderDisplayName: String,
+  val responderNonceBase64: String,
+  val responderIp: String? = null,
+  val responderPort: Int = 53317,
+  val responderSignatureBase64: String,
+)
+
+data class PairingApprovalPayload(
+  val version: Int = 1,
+  val sessionId: String,
+  val initiatorDeviceId: String,
+  val initiatorPublicKeyBase64: String,
+  val initiatorDisplayName: String,
+  val initiatorSignatureBase64: String,
+  val status: String = "PAIRED",
+)
 
 data class PairingRequest(
   val protocolVersion: Int,

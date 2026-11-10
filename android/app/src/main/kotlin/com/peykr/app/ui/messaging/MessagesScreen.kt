@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -609,7 +612,7 @@ fun ConversationDetailScreen(
 
   Scaffold(
     containerColor = PeykrTheme.colors.background,
-    contentWindowInsets = WindowInsets.safeDrawing,
+    contentWindowInsets = WindowInsets(0, 0, 0, 0),
     topBar = {
       // Modern elevated chat header
       Row(
@@ -618,6 +621,7 @@ fun ConversationDetailScreen(
           .shadow(elevation = 3.dp, spotColor = CardShadowColor)
           .background(PeykrTheme.colors.surface)
           .border(0.5.dp, PeykrTheme.colors.border)
+          .statusBarsPadding()
           .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -741,6 +745,7 @@ fun ConversationDetailScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
+        .navigationBarsPadding()
         .imePadding()
     ) {
       // Security Notice Pill
@@ -937,6 +942,7 @@ private fun MessageBubble(message: Message) {
   ) {
     Box(
       modifier = Modifier
+        .widthIn(max = 310.dp)
         .shadow(
           elevation = 2.dp,
           shape = if (isOutgoing) RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp) else RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp),

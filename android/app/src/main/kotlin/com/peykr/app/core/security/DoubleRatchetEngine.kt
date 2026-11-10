@@ -78,20 +78,112 @@ class DoubleRatchetEngine {
     )
   }
 
+  fun initializeInitiatorWithSharedSecret(
+    contactId: String,
+    sharedMasterSecret: ByteArray,
+    sendingChainInfo: String = "PeykrInitChain_1to2",
+    receivingChainInfo: String = "PeykrInitChain_2to1",
+  ): RatchetSessionState {
+    val localKeyPair = CryptoPrimitives.generateEcdhKeyPair()
+    val derivedSend = CryptoPrimitives.hkdf(
+      salt = sharedMasterSecret,
+      ikm = sendingChainInfo.toByteArray(),
+      info = KDF_RK_INFO,
+      length = 64,
+    )
+    val rootKey = derivedSend.copyOfRange(0, 32)
+    val sendingChainKey = derivedSend.copyOfRange(32, 64)
+
+    val derivedRecv = CryptoPrimitives.hkdf(
+      salt = sharedMasterSecret,
+      ikm = receivingChainInfo.toByteArray(),
+      info = KDF_RK_INFO,
+      length = 64,
+    )
+    val receivingChainKey = derivedRecv.copyOfRange(32, 64)
+
+    return RatchetSessionState(
+      contactId = contactId,
+      rootKey = rootKey,
+      sendingChainKey = sendingChainKey,
+      receivingChainKey = receivingChainKey,
+      localDhKeyPair = localKeyPair,
+      remoteDhPublicKey = null,
+      sendCounter = 0,
+      receiveCounter = 0,
+    )
+  }
+
+  fun initializeResponderWithSharedSecret(
+    contactId: String,
+    sharedMasterSecret: ByteArray,
+    sendingChainInfo: String = "PeykrInitChain_2to1",
+    receivingChainInfo: String = "PeykrInitChain_1to2",
+  ): RatchetSessionState {
+    val localKeyPair = CryptoPrimitives.generateEcdhKeyPair()
+    val derivedSend = CryptoPrimitives.hkdf(
+      salt = sharedMasterSecret,
+      ikm = sendingChainInfo.toByteArray(),
+      info = KDF_RK_INFO,
+      length = 64,
+    )
+    val rootKey = derivedSend.copyOfRange(0, 32)
+    val sendingChainKey = derivedSend.copyOfRange(32, 64)
+
+    val derivedRecv = CryptoPrimitives.hkdf(
+      salt = sharedMasterSecret,
+      ikm = receivingChainInfo.toByteArray(),
+      info = KDF_RK_INFO,
+      length = 64,
+    )
+    val receivingChainKey = derivedRecv.copyOfRange(32, 64)
+
+    return RatchetSessionState(
+      contactId = contactId,
+      rootKey = rootKey,
+      sendingChainKey = sendingChainKey,
+      receivingChainKey = receivingChainKey,
+      localDhKeyPair = localKeyPair,
+      remoteDhPublicKey = null,
+      sendCounter = 0,
+      receiveCounter = 0,
+    )
+  }
+
   fun ratchetEncrypt(
     state: RatchetSessionState,
     plaintext: ByteArray,
   ): Pair<RatchetSessionState, EncryptedRatchetMessage> {
-    val currentSendingCk = state.sendingChainKey
-      ?: error("Cannot encrypt before receiving initial handshake message")
+    var currentState = state
+    if (currentState.sendingChainKey == null && currentState.remoteDhPublicKey != null) {
+      // Advance sending DH ratchet when reply is initiated
+      val newLocalKeyPair = CryptoPrimitives.generateEcdhKeyPair()
+      val dhSendShared = CryptoPrimitives.computeSharedSecret(newLocalKeyPair.private, currentState.remoteDhPublicKey!!)
+      val derivedSend = CryptoPrimitives.hkdf(
+        salt = currentState.rootKey,
+        ikm = dhSendShared,
+        info = KDF_RK_INFO,
+        length = 64,
+      )
+      currentState = currentState.copy(
+        rootKey = derivedSend.copyOfRange(0, 32),
+        sendingChainKey = derivedSend.copyOfRange(32, 64),
+        localDhKeyPair = newLocalKeyPair,
+        previousChainLength = currentState.sendCounter,
+        sendCounter = 0,
+      )
+    }
+
+    val currentSendingCk = currentState.sendingChainKey
+      ?: error("Cannot encrypt before receiving initial handshake message or initializing session")
 
     val (nextCk, messageKey) = stepChainKey(currentSendingCk)
-    val localPubB64 = Base64.getEncoder().encodeToString(state.localDhKeyPair.public.encoded)
+    val localPubB64 = Base64.getEncoder().encodeToString(currentState.localDhKeyPair.public.encoded)
 
     val header = RatchetHeader(
       senderDhPublicKeyBase64 = localPubB64,
-      sequenceNumber = state.sendCounter,
-      previousChainLength = state.previousChainLength,
+      sequenceNumber = currentState.sendCounter,
+      previousChainLength = currentState.previousChainLength,
     )
 
     val associatedData = serializeHeader(header)
@@ -101,9 +193,9 @@ class DoubleRatchetEngine {
       associatedData = associatedData,
     )
 
-    val updatedState = state.copy(
+    val updatedState = currentState.copy(
       sendingChainKey = nextCk,
-      sendCounter = state.sendCounter + 1,
+      sendCounter = currentState.sendCounter + 1,
     )
 
     val message = EncryptedRatchetMessage(
@@ -123,10 +215,47 @@ class DoubleRatchetEngine {
     val remotePublicKey = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(remotePubBytes))
 
     var currentState = state
-    val isNewDhKey = state.remoteDhPublicKey == null || !state.remoteDhPublicKey.encoded.contentEquals(remotePublicKey.encoded)
 
-    if (isNewDhKey) {
-      // Step 1: DH ratchet with our current private key and their new public key
+    if (currentState.remoteDhPublicKey == null) {
+      if (currentState.receivingChainKey != null) {
+        // Initial chain established from shared secret; record remote DH public key for replies
+        currentState = currentState.copy(remoteDhPublicKey = remotePublicKey)
+      } else {
+        // First message for a standard responder
+        val dhReceiveShared = CryptoPrimitives.computeSharedSecret(currentState.localDhKeyPair.private, remotePublicKey)
+        val derivedReceive = CryptoPrimitives.hkdf(
+          salt = currentState.rootKey,
+          ikm = dhReceiveShared,
+          info = KDF_RK_INFO,
+          length = 64,
+        )
+        val newRootKey1 = derivedReceive.copyOfRange(0, 32)
+        val newReceivingCk = derivedReceive.copyOfRange(32, 64)
+
+        val newLocalKeyPair = CryptoPrimitives.generateEcdhKeyPair()
+        val dhSendShared = CryptoPrimitives.computeSharedSecret(newLocalKeyPair.private, remotePublicKey)
+        val derivedSend = CryptoPrimitives.hkdf(
+          salt = newRootKey1,
+          ikm = dhSendShared,
+          info = KDF_RK_INFO,
+          length = 64,
+        )
+        val newRootKey2 = derivedSend.copyOfRange(0, 32)
+        val newSendingCk = derivedSend.copyOfRange(32, 64)
+
+        currentState = currentState.copy(
+          rootKey = newRootKey2,
+          receivingChainKey = newReceivingCk,
+          sendingChainKey = newSendingCk,
+          localDhKeyPair = newLocalKeyPair,
+          remoteDhPublicKey = remotePublicKey,
+          previousChainLength = currentState.sendCounter,
+          sendCounter = 0,
+          receiveCounter = 0,
+        )
+      }
+    } else if (!currentState.remoteDhPublicKey!!.encoded.contentEquals(remotePublicKey.encoded)) {
+      // Subsequent DH ratchet step: remote DH key rotated
       val dhReceiveShared = CryptoPrimitives.computeSharedSecret(currentState.localDhKeyPair.private, remotePublicKey)
       val derivedReceive = CryptoPrimitives.hkdf(
         salt = currentState.rootKey,
@@ -137,7 +266,6 @@ class DoubleRatchetEngine {
       val newRootKey1 = derivedReceive.copyOfRange(0, 32)
       val newReceivingCk = derivedReceive.copyOfRange(32, 64)
 
-      // Step 2: Generate fresh local DH pair for sending
       val newLocalKeyPair = CryptoPrimitives.generateEcdhKeyPair()
       val dhSendShared = CryptoPrimitives.computeSharedSecret(newLocalKeyPair.private, remotePublicKey)
       val derivedSend = CryptoPrimitives.hkdf(
@@ -161,8 +289,31 @@ class DoubleRatchetEngine {
       )
     }
 
-    val currentRecvCk = currentState.receivingChainKey
+    val isSameDhKey = currentState.remoteDhPublicKey != null &&
+      currentState.remoteDhPublicKey!!.encoded.contentEquals(remotePublicKey.encoded)
+
+    if (isSameDhKey && message.header.sequenceNumber < currentState.receiveCounter) {
+      throw SecurityException(
+        "Replay attack detected: sequence number ${message.header.sequenceNumber} is less than current receive counter ${currentState.receiveCounter}"
+      )
+    }
+
+    if (message.header.sequenceNumber - currentState.receiveCounter > MAX_SKIPPED_KEYS) {
+      throw SecurityException(
+        "Message sequence leap (${message.header.sequenceNumber} - ${currentState.receiveCounter}) exceeds maximum threshold ($MAX_SKIPPED_KEYS)"
+      )
+    }
+
+    var currentRecvCk = currentState.receivingChainKey
       ?: error("Receiving chain key is not initialized")
+    var currentRecvCounter = currentState.receiveCounter
+
+    // Advance chain forward if sequence number skipped ahead (out-of-order or dropped packets)
+    while (currentRecvCounter < message.header.sequenceNumber) {
+      val (skippedCk, _) = stepChainKey(currentRecvCk)
+      currentRecvCk = skippedCk
+      currentRecvCounter++
+    }
 
     val (nextRecvCk, messageKey) = stepChainKey(currentRecvCk)
     val associatedData = serializeHeader(message.header)
@@ -178,7 +329,7 @@ class DoubleRatchetEngine {
 
     val finalState = currentState.copy(
       receivingChainKey = nextRecvCk,
-      receiveCounter = currentState.receiveCounter + 1,
+      receiveCounter = currentRecvCounter + 1,
     )
 
     return Pair(finalState, plaintext)
@@ -208,5 +359,6 @@ class DoubleRatchetEngine {
     private val KDF_RK_INFO = "PeykrDoubleRatchetRK".toByteArray()
     private val MESSAGE_KEY_SEED = byteArrayOf(0x01)
     private val CHAIN_KEY_SEED = byteArrayOf(0x02)
+    const val MAX_SKIPPED_KEYS = 2000
   }
 }

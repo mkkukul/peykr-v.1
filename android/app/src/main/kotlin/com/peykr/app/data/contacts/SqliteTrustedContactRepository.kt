@@ -84,7 +84,7 @@ class SqliteTrustedContactRepository(context: Context, databaseName: String = En
 
   override suspend fun add(contact: TrustedContact) = withContext(Dispatchers.IO) {
     validate(contact)
-    ensureReady().insertOrThrow(EncryptedContactDatabase.TABLE, null, contact.toValues())
+    ensureReady().insertWithOnConflict(EncryptedContactDatabase.TABLE, null, contact.toValues(), SQLiteDatabase.CONFLICT_REPLACE)
     publish()
   }
 
@@ -119,6 +119,9 @@ private fun TrustedContact.toValues() = ContentValues().apply {
 
 private fun android.database.Cursor.toContact() = TrustedContact(
   id = getString(0), displayName = getString(1), publicIdentity = if (isNull(2)) null else getString(2),
-  pairingStatus = runCatching { PairingStatus.valueOf(getString(3)) }.getOrDefault(PairingStatus.NOT_PAIRED),
+  pairingStatus = runCatching {
+    val raw = getString(3)
+    if (raw == "PENDING") PairingStatus.PAIRING else PairingStatus.valueOf(raw)
+  }.getOrDefault(PairingStatus.NOT_PAIRED),
   createdAtEpochMillis = getLong(4), revokedAtEpochMillis = if (isNull(5)) null else getLong(5),
 )

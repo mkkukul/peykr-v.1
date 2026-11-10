@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -555,7 +556,7 @@ class PairingEngineTest {
   }
 
   @Test
-  fun cancelledSession_rejectsFurtherOperationsAndDemotesContact() = runTest {
+  fun cancelledSession_rejectsFurtherOperationsAndCleansUpPendingContact() = runTest {
     val deviceA = TestDeviceIdentity("DeviceA")
     val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
     val repoA = InMemoryContactRepository()
@@ -578,7 +579,25 @@ class PairingEngineTest {
     // User cancels session on Device A
     val cancelled = engineA.cancelSession(sessionAWaiting).getOrThrow()
     assertEquals(PairingSessionState.REJECTED, cancelled.state)
-    assertEquals(PairingStatus.NOT_PAIRED, repoA.getById(deviceB.deviceId)?.pairingStatus)
+    // Pending unconfirmed contact is removed, never left as NOT_PAIRED to prevent "Eşleşmedi" bugs
+    assertNull(repoA.getById(deviceB.deviceId))
+  }
+
+  @Test
+  fun cancelledSession_neverDemotesAlreadyPairedContact() = runTest {
+    val deviceA = TestDeviceIdentity("DeviceA")
+    val gateA = DefaultSecurityGate(FakeBiometricAuthenticator())
+    val repoA = InMemoryContactRepository()
+    val engineA = DefaultPairingEngine(deviceA, gateA, repoA)
+
+    val deviceB = TestDeviceIdentity("DeviceB")
+    repoA.add(TrustedContact(deviceB.deviceId, "Bob", deviceB.publicKeyBase64, PairingStatus.PAIRED, 1000L))
+
+    val sessionA = engineA.createInitiatorSession("Alice").getOrThrow()
+    val cancelled = engineA.cancelSession(sessionA).getOrThrow()
+    assertEquals(PairingSessionState.REJECTED, cancelled.state)
+    // Already paired contact must remain PAIRED
+    assertEquals(PairingStatus.PAIRED, repoA.getById(deviceB.deviceId)?.pairingStatus)
   }
 
   @Test

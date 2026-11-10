@@ -143,6 +143,10 @@ fun MainNavigation(
             pairingEngine = engine,
             securityGate = gate ?: error("SecurityGate required"),
             deviceIdentity = identity,
+            localHttpClient = appContainer?.localHttpClient,
+            contactRepository = repository,
+            localHttpServer = appContainer?.localHttpServer,
+            localNetworkDiscovery = appContainer?.localNetworkDiscovery,
           )
         }
         entry<MessagesList> {

@@ -19,18 +19,26 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
-class LocalHttpClient(
+data class DirectSendAck(
+  val success: Boolean,
+  val messageId: String? = null,
+  val ackPayload: String? = null,
+  val ackSignature: String? = null,
+  val errorMessage: String? = null,
+)
+
+open class LocalHttpClient(
   private val localDeviceId: String,
   private val localDisplayName: String,
   private val connectTimeoutMs: Int = 4000,
   private val readTimeoutMs: Int = 10000,
 ) {
 
-  suspend fun sendDirectMessage(
+  open suspend fun sendDirectMessage(
     target: DiscoveredDevice,
     message: Message,
     encryptedPayload: com.peykr.app.core.security.EncryptedRatchetMessage? = null,
-  ): Result<Boolean> = withContext(Dispatchers.IO) {
+  ): Result<DirectSendAck> = withContext(Dispatchers.IO) {
     runCatching {
       if (encryptedPayload == null) {
         throw SecurityException("Refusing to transmit unencrypted message over network: end-to-end encryption is required")
@@ -64,8 +72,82 @@ class LocalHttpClient(
       connection.outputStream.use { it.write(bytes) }
 
       val responseCode = connection.responseCode
-      connection.disconnect()
-      responseCode == 200
+      if (responseCode == 200) {
+        val respBody = connection.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+        connection.disconnect()
+        val respJson = JSONObject(respBody)
+        val status = respJson.optString("status")
+        val ackMsgId = respJson.optString("messageId")
+        val ackPayload = respJson.optString("ackPayload")
+        val ackSignature = respJson.optString("ackSignature")
+        DirectSendAck(
+          success = (status == "DELIVERED"),
+          messageId = ackMsgId.ifEmpty { null },
+          ackPayload = ackPayload.ifEmpty { null },
+          ackSignature = ackSignature.ifEmpty { null },
+        )
+      } else {
+        val errBody = runCatching { connection.errorStream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() } }.getOrNull()
+        connection.disconnect()
+        DirectSendAck(
+          success = false,
+          errorMessage = "HTTP $responseCode: $errBody",
+        )
+      }
+    }
+  }
+
+  suspend fun sendPairingExchange(
+    targetIp: String,
+    targetPort: Int,
+    payload: com.peykr.app.domain.pairing.PairingExchangePayload,
+  ): Result<com.peykr.app.domain.pairing.PairingApprovalPayload> = withContext(Dispatchers.IO) {
+    runCatching {
+      val url = URL("http://$targetIp:$targetPort/api/peykr/v1/pair/exchange")
+      val connection = (url.openConnection() as HttpURLConnection).apply {
+        requestMethod = "POST"
+        connectTimeout = connectTimeoutMs
+        readTimeout = readTimeoutMs
+        doOutput = true
+        setRequestProperty("Content-Type", "application/json; charset=utf-8")
+      }
+
+      val json = JSONObject().apply {
+        put("v", payload.version)
+        put("sid", payload.sessionId)
+        put("id", payload.responderDeviceId)
+        put("pk", payload.responderPublicKeyBase64)
+        put("name", payload.responderDisplayName)
+        put("nonce", payload.responderNonceBase64)
+        put("sig", payload.responderSignatureBase64)
+        if (payload.responderIp != null) {
+          put("ip", payload.responderIp)
+          put("port", payload.responderPort)
+        }
+      }
+
+      val bytes = json.toString().toByteArray(StandardCharsets.UTF_8)
+      connection.outputStream.use { it.write(bytes) }
+
+      val responseCode = connection.responseCode
+      if (responseCode == 200) {
+        val respBody = connection.inputStream.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+        connection.disconnect()
+        val respJson = JSONObject(respBody)
+        com.peykr.app.domain.pairing.PairingApprovalPayload(
+          version = respJson.optInt("v", 1),
+          sessionId = payload.sessionId,
+          initiatorDeviceId = respJson.getString("initiatorDeviceId"),
+          initiatorPublicKeyBase64 = respJson.getString("initiatorPublicKeyBase64"),
+          initiatorDisplayName = respJson.optString("initiatorDisplayName", "Peykr Cihazı"),
+          initiatorSignatureBase64 = respJson.optString("signature", ""),
+          status = "PAIRED",
+        )
+      } else {
+        val errBody = runCatching { connection.errorStream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() } }.getOrNull()
+        connection.disconnect()
+        throw IllegalStateException("Pairing exchange failed HTTP $responseCode: $errBody")
+      }
     }
   }
 
